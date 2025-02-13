@@ -20,7 +20,7 @@ jobs:
       HELM_IMAGE_VERSION: "alpine/helm:3.8.1" #https://hub.docker.com/r/alpine/helm/tags
       OC_IMAGE_VERSION: "quay.io/openshift/origin-cli:4.9.0" #https://quay.io/repository/openshift/origin-cli?tab=tags
       general: ${{ toJSON(github.event.inputs.github_metadata) }}
-      reponame: ${{ toJSON(github.event.inputs.github_metadata.general.repoName) }}
+      reponame: ${{ github.event.inputs.github_metadata.general.repoName }}
 
 
     steps:
