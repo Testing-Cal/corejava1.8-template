@@ -19,9 +19,7 @@ jobs:
       KUBECTL_IMAGE_VERSION: "bitnami/kubectl:1.28" #https://hub.docker.com/r/bitnami/kubectl/tags
       HELM_IMAGE_VERSION: "alpine/helm:3.8.1" #https://hub.docker.com/r/alpine/helm/tags
       OC_IMAGE_VERSION: "quay.io/openshift/origin-cli:4.9.0" #https://quay.io/repository/openshift/origin-cli?tab=tags
-      general: ${{ toJSON(github.event.inputs.github_metadata) }}
-      reponame: ${{ github.event.inputs.github_metadata.general.repoName }}
-
+    
 
     steps:
         
@@ -34,5 +32,9 @@ jobs:
           
       - name: Initialization
         run: |
-          echo ${{ env.general }}
-          echo ${{ env.reponame }}
+          JSON_STRING='${{ inputs.github_metadata }}'
+          reponame=$(echo "$JSON_STRING" | jq -r '.reponame')
+          echo "reponame=$reponame" >> "$GITHUB_ENV"
+      - name: Use Extracted Key
+        run: |
+          echo "The extracted name is $reponame"
