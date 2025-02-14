@@ -23,28 +23,10 @@ jobs:
 
     steps:
         
-      - name: create-json for metadata
-        id: create-json
-        uses: jsdaniell/create-json@1.1.2
-        with:
-          name: "credentials.json"
-          json: ${{ github.event.inputs.github_metadata }}
+      - name: Configure Kubeconfig File
+        env:
+          KUBECONFIG: ${{ secrets.KUBE_CONFIG }}
+        run: |
+          kubectl get ns
           
-      - name: Initialization
-        run: |
-          JSON_STRING='${{ inputs.github_metadata }}'
-         
-          echo "REGISTRY_URL=$(echo "$JSON_STRING" | jq -r '.general.containerImagePath')" >> "$GITHUB_ENV"
-          echo "BUILD_TAG=$(echo "$JSON_STRING" | jq -r '.general.containerImageTag')"  >> "$GITHUB_ENV"
-          echo "ARTIFACTORY_CREDENTIALS=$(echo "$JSON_STRING" | jq -r '.general.artifactorySecret')"  >> "$GITHUB_ENV"
-          echo "SONAR_CREDENTIAL_ID=$(echo "$JSON_STRING" | jq -r '.general.sonarSecret')"  >> "$GITHUB_ENV"
-          echo "ARTIFACTORY=$(echo "$JSON_STRING" | jq -r '.general.artifactory')"  >> "$GITHUB_ENV"
-          echo "STAGE_FLAG=$(echo "$JSON_STRING" | jq -r '.general.stageFlag')"  >> "$GITHUB_ENV"
-          echo "CONTAINERSCANTYPE=$(echo "$JSON_STRING" | jq -r '.general.containerScanType')"  >> "$GITHUB_ENV"
-          echo "DOCKERHOST=$(echo "$JSON_STRING" | jq -r '.general.dockerHostIP')"  >> "$GITHUB_ENV"
-          echo "RELEASE_NAME=$(echo "$JSON_STRING" | jq -r '.general.name')"  >> "$GITHUB_ENV"
-          echo "CONTEXT=$(echo "$JSON_STRING" | jq -r '.general.contextPath')" >> "$GITHUB_ENV"
-
-      - name: Use Extracted Key
-        run: |
-          echo "The extracted name is $REGISTRY_URL, $BUILD_TAG, $ARTIFACTORY_CREDENTIALS, $SONAR_CREDENTIAL_ID, $ARTIFACTORY, $STAGE_FLAG, $CONTAINERSCANTYPE, $DOCKERHOST, $RELEASE_NAME, $CONTEXT"
+      
