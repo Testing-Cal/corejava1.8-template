@@ -1,0 +1,75 @@
+name: deploy-to-vm
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_number:
+        default: '10'
+        type: string
+        required: true
+      k8s_namespace:
+        default: 'default'
+        type: string
+        required: true
+      github_metadata:
+        default: '{"general":{"name":"120ang17_CI","repoName":"120ang17","sonarProjectKey":"devsecops_120ang17","helmReleaseName":"a120ang17","contextPath":"/120nest10","sonarHost":"https://sonarqube.tenant604134.ibdp.calibo.com","tenant":"Tenant950174","lazsaDomainUri":"https://lazsa-dis.calibo.com","devopsSettingId":"3c7e6b67-e0bc-4bb7-9260-9f9e7bad20b8","agentApiKey":"zMhoTfcHkPZb4XM2z7TdmFj8iql6P0buiq8IWNw2oegAQdhejQ+mlaPLjpMkhxeOVQ3+LGdLan+lmyXXsSnky+xRw88dkWnBnJh6yytW55zcV0jby8DpKBva3hGKHMLZBXvyK/3zk9koZ+GROkHexHAGocsxhCmzuzXMUffFajRWe8TwL4zfuep1W7VoPmVDsotdp67yQwo9t60luT5WXKK8hkLCBu2OksPXRE1DSao\u003d","agentId":"d32f0932-76e1-41d8-a7ca-e5f424544a79","orchCertCredentialId":"","sonarOrg":"default-organization","artifactory":"JFROG","artifactorySecret":"Tenant950174-38f4e023-93dc-4fec-851b-b6db3317356d-JFROG","kubernetesSecret":"Tenant950174-b75b4b82-5648-403e-9c76-79389f2ee7fb","containerScanType":"","dynamicJenkinsStage":"false","stageFlag":"{\"sonarScan\":true,\"zapScan\":false,\"containerScan\":false,\"qualysScan\":false,\"FunctionalTesting\":false}","dockerHostIP":"","containerImagePath":"artifactory.tenant604134.ibdp.calibo.com/towerofgods-docker-albstagelevel-local/godsslayer/120ang17","sonarSecret":"TENANT950174_336451CB_B0FC_45E9_9F6E_D3F1E4704A3B_SONAR","artifactPublish":false},"docker":{"appPort":"4200","hostPort":"4200"},"helm":{"additionalArguments":"","additionalFiles":"","workingDirectory":"helm_chart","namespace":"dev4","type":"lazsa","values":""},"kubernetes":{"namespace":"dev4","replicaCount":"1","resources":{"limits":{"cpu":"500m","memory":"512Mi"},"requests":{"cpu":"200m","memory":"256Mi"}},"ingress":{"enabled":true,"paths":{"path":"/120nest10"},"ingressClass":"alb","controllerType":"alb","albExtraAnnotations":{"alb.ingress.kubernetes.io/group.name":"newalb"}},"service":{"type":"ClusterIP"}}}'
+        type: string
+        required: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: 'dev'
+      url: 'https://test.com'
+    env:
+      JAVA_MVN_IMAGE_VERSION: "amazoncorretto:8-alpine" #https://hub.docker.com/_/maven/tags
+      KUBECTL_IMAGE_VERSION: "bitnami/kubectl:1.28" #https://hub.docker.com/r/bitnami/kubectl/tags
+      HELM_IMAGE_VERSION: "alpine/helm:3.8.1" #https://hub.docker.com/r/alpine/helm/tags
+      OC_IMAGE_VERSION: "quay.io/openshift/origin-cli:4.9.0" #https://quay.io/repository/openshift/origin-cli?tab=tags
+
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+          
+      - name: Initialization
+        run: |
+          JSON_STRING='${{ inputs.github_metadata }}'
+         
+          echo "REGISTRY_URL=$(echo "$JSON_STRING" | jq -r '.general.containerImagePath')" >> "$GITHUB_ENV"
+          echo "BUILD_TAG=${{ github.run_number }}"  >> "$GITHUB_ENV"
+          echo "ARTIFACTORY_CREDENTIALS=$(echo "$JSON_STRING" | jq -r '.general.artifactorySecret')"  >> "$GITHUB_ENV"
+          echo "SONAR_CREDENTIAL_ID=$(echo "$JSON_STRING" | jq -r '.general.sonarSecret')"  >> "$GITHUB_ENV"
+          echo "ARTIFACTORY=$(echo "$JSON_STRING" | jq -r '.general.artifactory')"  >> "$GITHUB_ENV"
+          echo "STAGE_FLAG=$(echo "$JSON_STRING" | jq -r '.general.stageFlag')"  >> "$GITHUB_ENV"
+          echo "CONTAINERSCANTYPE=$(echo "$JSON_STRING" | jq -r '.general.containerScanType')"  >> "$GITHUB_ENV"
+          echo "DOCKERHOST=$(echo "$JSON_STRING" | jq -r '.general.dockerHostIP')"  >> "$GITHUB_ENV"
+          echo "RELEASE_NAME=$(echo "$JSON_STRING" | jq -r '.general.name')"  >> "$GITHUB_ENV"
+          echo "CONTEXT=$(echo "$JSON_STRING" | jq -r '.general.contextPath')" >> "$GITHUB_ENV"
+          echo "sonar_org=$(echo "$JSON_STRING" | jq -r '.general.sonarOrg')" >> "$GITHUB_ENV"
+          echo "sonar_host=$(echo "$JSON_STRING" | jq -r '.general.sonarHost')" >> "$GITHUB_ENV"
+          echo "sonar_project_key=$(echo "$JSON_STRING" | jq -r '.general.sonarProjectKey')" >> "$GITHUB_ENV"
+      
+
+      - name: Unit Test
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE":/opt/repo -w /opt/repo $JAVA_MVN_IMAGE_VERSION ./mvnw test --batch-mode
+
+      - name: SonarQube Scan
+        run: |
+          docker run -v "$GITHUB_WORKSPACE":/app -w /app sonarsource/sonar-scanner-cli:11.0 -Dsonar.java.binaries='.' -Dsonar.exclusions='pom.xml, target/**/*' -Dsonar.projectKey="$sonar_project_key" -Dsonar.projectName="$sonar_project_key" -Dsonar.sources=src -Dsonar.host.url="$sonar_host" -Dsonar.organization="$sonar_org" -Dsonar.login=${{ secrets.TENANT950174_336451CB_B0FC_45E9_9F6E_D3F1E4704A3B_SONAR}} -Dsonar.token=${{ secrets.TENANT950174_336451CB_B0FC_45E9_9F6E_D3F1E4704A3B_SONAR}}
+
+      - name: Build
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE":/opt/repo -w /opt/repo $JAVA_MVN_IMAGE_VERSION ./mvnw clean install -Dmaven.test.skip=true
+
+      - name: Build Container Image
+        run: |
+          docker build -t "$REGISTRY_URL:$BUILD_TAG" -t "$REGISTRY_URL:latest" .
+          
+      - name: Publish Container Image
+        run: |
+          docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }} "$REGISTRY_URL"
+          docker push "$REGISTRY_URL:$BUILD_TAG"
+          docker push "$REGISTRY_URL:latest"
