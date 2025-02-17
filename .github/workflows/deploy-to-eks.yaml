@@ -50,20 +50,33 @@ jobs:
           echo "sonar_org=$(echo "$JSON_STRING" | jq -r '.general.sonarOrg')" >> "$GITHUB_ENV"
           echo "sonar_host=$(echo "$JSON_STRING" | jq -r '.general.sonarHost')" >> "$GITHUB_ENV"
           echo "sonar_project_key=$(echo "$JSON_STRING" | jq -r '.general.sonarProjectKey')" >> "$GITHUB_ENV"
+          echo "helmReleaseName=$(echo "$JSON_STRING" | jq -r '.general.helmReleaseName')" >> "$GITHUB_ENV"
+          echo "namespace_name=$(echo "$JSON_STRING" | jq -r '.kubernetes.namespace')" >> "$GITHUB_ENV"
+          
+          
       
 
       - name: Configure Kubeconfig File
         env:
-          KUBECONFIG: ${{ secrets.KUBE_CONFIG }}
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
         run: |
           mkdir -p $HOME/.kube
           echo "${{ env.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config
-          
-      
+
+      - name: convert json to yaml file 
+        run: |
+          apt install yq -y
+    
+      - name: Deploy to Kubernetes
+        run: |
+           sed -i s+#SERVICE_NAME#+"$helmReleaseName"+g ./helm_chart/values.yaml ./helm_chart/Chart.yaml
+           docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" $KUBECTL_IMAGE_VERSION create ns "$namespace_name" || true
+                                            
+
     
           
       - name: Publish Container Image
         run: |
           docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }} "$REGISTRY_URL"
-          docker push "$REGISTRY_URL:$BUILD_TAG"
-          docker push "$REGISTRY_URL:latest"
+          #docker push "$REGISTRY_URL:$BUILD_TAG"
+          #docker push "$REGISTRY_URL:latest"
