@@ -81,7 +81,7 @@ jobs:
             AWS_ACCESS_KEY_ID=${{ secrets.promoteSourceArtifactoryUserSecret }} AWS_SECRET_ACCESS_KEY=${{ secrets.promoteSourceArtifactoryPasswordSecret }} aws ecr get-login-password --region "$PROMOTE_SOURCE_ECR_REGION" | docker login --username AWS --password-stdin $PROMOTE_SOURCE_LOGIN_URL 
             set -x
           else
-            docker login -u${{ secrets.promoteSourceArtifactoryUserSecret }} -p ${{ secrets.promoteSourceArtifactoryPasswordSecret }} "$PROMOTE_SOURCE_LOGIN_URL"
+            docker login -u ${{ secrets.promoteSourceArtifactoryUserSecret }} -p ${{ secrets.promoteSourceArtifactoryPasswordSecret }} "$PROMOTE_SOURCE_LOGIN_URL"
           fi
 
           docker pull $promoteSource
@@ -104,11 +104,11 @@ jobs:
               docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" -v "$WORKSPACE":/apps -w /apps $OC_IMAGE_VERSION oc adm policy add-scc-to-user anyuid -z $ACCOUNT -n "$namespace_name"
            fi
            
-           JFROG_LOGIN_URL=$(echo "$REGISTRY_URL" | cut -d'/' -f1)
+           DOCKER_LOGIN_URL=$(echo "$REGISTRY_URL" | cut -d'/' -f1)
             
            ## hardcoded name regcred need to be change
            docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" $KUBECTL_IMAGE_VERSION -n "$namespace_name" delete secret regcred --ignore-not-found || true
-           docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" $KUBECTL_IMAGE_VERSION -n "$namespace_name" create secret docker-registry regcred --docker-server="$JFROG_LOGIN_URL" --docker-username="$USERNAME" --docker-password="$PASSWORD" || true
+           docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" $KUBECTL_IMAGE_VERSION -n "$namespace_name" create secret docker-registry regcred --docker-server="$DOCKER_LOGIN_URL" --docker-username=${{ secrets.ArtifactoryUserSecret }} --docker-password="${{ secrets.ArtifactoryPasswordSecret }}" || true
                                                
            # custom helm chart
 
