@@ -1,6 +1,9 @@
 name: Qualys Scan Test
 
 on:
+  push:
+    branches:
+      - 'main'
   workflow_dispatch:
     inputs:
       github_metadata:
@@ -42,7 +45,6 @@ jobs:
         if: env.CONTAINER_SCAN_TYPE == 'QUALYS'
         run: |
           echo "Here we are going to scan Qualys Scan"
-          docker ps
-          docker image ls 
+          echo "$id"
           
       
