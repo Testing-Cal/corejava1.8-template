@@ -46,7 +46,7 @@ jobs:
         run: |
           echo "Here we are going to scan Qualys Scan"
           curl -u "${{ secrets.QUALYS_USERNAME }}:${{ secrets.QUALYS_PASSWORD }}" \
-               -X POST "https://qualysapi.qualys.com/csapi/v1.2/images/scan" \
+               -X POST "https://qualysapi.qualys.com/csapi/latest/images/scan" \
                -H "Content-Type: application/json" \
                -d '{
                     "imageId": "busybox",
