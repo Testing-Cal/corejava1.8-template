@@ -45,8 +45,8 @@ jobs:
         if: env.CONTAINER_SCAN_TYPE == 'QUALYS'
         run: |
           echo "Here we are going to scan Qualys Scan"
-          curl -u "${{ secrets.QUALYS_USERNAME }}:${{ secrets.QUALYS_PASSWORD }}" \
-               -X POST "https://qualysapi.qg1.apps.qualys.in/csapi/v1.3/images/scan" \
+          curl -u "cab8ss2:Qualys@1705" \
+               -X POST "https://qualysapi.qg1.apps.qualys.in/csapi/v1.2/images/scan" \
                -H "Content-Type: application/json" \
                -d '{
                     "imageId": "busybox",
