@@ -1,4 +1,4 @@
-name: test
+name: Qualys Scan Test
 
 on:
   workflow_dispatch:
@@ -32,7 +32,7 @@ jobs:
                 echo "CONTAINER_SCAN_TYPE=$(echo "$JSON_STRING" | jq -r '.general.containerScanType')" >> "$GITHUB_ENV"
 
       
-                echo "$JSON_STRING" | jq -r '.kubernetes' | yq -P > Helm.yaml
+                #echo "$JSON_STRING" | jq -r '.kubernetes' | yq -P > Helm.yaml
                 #echo "$JSON_STRING" | jq -r '.kubernetes.vault' | yq -P > Vault.yaml
 
       - name: Print ContainerScanType
