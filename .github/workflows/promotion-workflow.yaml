@@ -35,10 +35,11 @@ jobs:
           
       - name: Initialization
         run: |
+          sudo apt install yq -y 
           JSON_STRING='${{ inputs.github_metadata }}'
          
           echo "REGISTRY_URL=$(echo "$JSON_STRING" | jq -r '.general.containerImagePath')" >> "$GITHUB_ENV"
-          echo "BUILD_TAG=${{ github.run_number }}"  >> "$GITHUB_ENV"
+          echo "BUILD_TAG=$(echo "$JSON_STRING" | jq -r '.general.containerImageTag')"  >> "$GITHUB_ENV"
           echo "ARTIFACTORY_CREDENTIALS=$(echo "$JSON_STRING" | jq -r '.general.artifactorySecret')"  >> "$GITHUB_ENV"
           echo "SONAR_CREDENTIAL_ID=$(echo "$JSON_STRING" | jq -r '.general.sonarSecret')"  >> "$GITHUB_ENV"
           echo "ARTIFACTORY=$(echo "$JSON_STRING" | jq -r '.general.artifactory')"  >> "$GITHUB_ENV"
@@ -50,26 +51,48 @@ jobs:
           echo "sonar_org=$(echo "$JSON_STRING" | jq -r '.general.sonarOrg')" >> "$GITHUB_ENV"
           echo "sonar_host=$(echo "$JSON_STRING" | jq -r '.general.sonarHost')" >> "$GITHUB_ENV"
           echo "sonar_project_key=$(echo "$JSON_STRING" | jq -r '.general.sonarProjectKey')" >> "$GITHUB_ENV"
+          echo "helmReleaseName=$(echo "$JSON_STRING" | jq -r '.general.helmReleaseName')" >> "$GITHUB_ENV"
+          echo "namespace_name=$(echo "$JSON_STRING" | jq -r '.kubernetes.namespace')" >> "$GITHUB_ENV"
+          echo "helmRepoUrl=$(echo "$JSON_STRING" | jq -r '.helm.helmRepoUrl')" >> "$GITHUB_ENV"
+          echo "promoteSource=$(echo "$JSON_STRING" | jq -r '.general.promoteSource')" >> "$GITHUB_ENV"
+          echo "promoteSourceArtifactoryUserSecret=$(echo "$JSON_STRING" | jq -r '.general.promoteSourceArtifactoryUserSecret')" >> "$GITHUB_ENV"
+          echo "promoteSourceArtifactoryPasswordSecret=$(echo "$JSON_STRING" | jq -r '.general.promoteSourceArtifactoryPasswordSecret')" >> "$GITHUB_ENV"
+          echo "ArtifactoryUserSecret=$(echo "$JSON_STRING" | jq -r '.general.ArtifactoryUserSecret')" >> "$GITHUB_ENV"
+          echo "ArtifactoryPasswordSecret=$(echo "$JSON_STRING" | jq -r '.general.ArtifactoryPasswordSecret')" >> "$GITHUB_ENV"
+          echo "promoteSourceArtifactoryType=$(echo "$JSON_STRING" | jq -r '.general.promoteSourceArtifactoryType')" >> "$GITHUB_ENV"
+          echo "promoteTag=$(echo "$JSON_STRING" | jq -r '.general.promoteTag')" >> "$GITHUB_ENV"
+          
+
+
+          echo "$JSON_STRING" | jq -r '.kubernetes' | yq -P > Helm.yaml
+          #echo "$JSON_STRING" | jq -r '.kubernetes.vault' | yq -P > Vault.yaml
       
 
-      - name: Unit Test
-        run: |
-          docker run --rm -v "$GITHUB_WORKSPACE":/opt/repo -w /opt/repo $JAVA_MVN_IMAGE_VERSION ./mvnw test --batch-mode
-
-      - name: SonarQube Scan
-        run: |
-          docker run -v "$GITHUB_WORKSPACE":/app -w /app sonarsource/sonar-scanner-cli:11.0 -Dsonar.java.binaries='.' -Dsonar.exclusions='pom.xml, target/**/*' -Dsonar.projectKey="$sonar_project_key" -Dsonar.projectName="$sonar_project_key" -Dsonar.sources=src -Dsonar.host.url="$sonar_host" -Dsonar.organization="$sonar_org" -Dsonar.login=${{ secrets.TENANT950174_336451CB_B0FC_45E9_9F6E_D3F1E4704A3B_SONAR}} -Dsonar.token=${{ secrets.TENANT950174_336451CB_B0FC_45E9_9F6E_D3F1E4704A3B_SONAR}}
-
-      - name: Build
-        run: |
-          docker run --rm -v "$GITHUB_WORKSPACE":/opt/repo -w /opt/repo $JAVA_MVN_IMAGE_VERSION ./mvnw clean install -Dmaven.test.skip=true
-
-      - name: Build Container Image
-        run: |
-          docker build -t "$REGISTRY_URL:$BUILD_TAG" -t "$REGISTRY_URL:latest" .
-          
-      - name: Publish Container Image
+      - name: Artifact Promotion 
         run: |
           docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }} "$REGISTRY_URL"
           docker push "$REGISTRY_URL:$BUILD_TAG"
           docker push "$REGISTRY_URL:latest"
+         
+          PROMOTE_SOURCE_LOGIN_URL=$(echo "$promoteSource" | cut -d'/' -f1)
+          if [[ $promoteSourceArtifactoryType == "ECR" ]]
+          then
+            REGION=$(echo "$promoteSource" | cut -d'.' -f4)
+            PROMOTE_SOURCE_ECR_REGION=$(echo "$promoteSource" | cut -d'.' -f4)
+            set +x 
+            AWS_ACCESS_KEY_ID=${{ secrets.promoteSourceArtifactoryUserSecret }} AWS_SECRET_ACCESS_KEY=${{ secrets.promoteSourceArtifactoryPasswordSecret }} aws ecr get-login-password --region "$PROMOTE_SOURCE_ECR_REGION" | docker login --username AWS --password-stdin $PROMOTE_SOURCE_LOGIN_URL 
+            set -x
+          else
+            docker login -u${{ secrets.promoteSourceArtifactoryUserSecret }} -p ${{ secrets.promoteSourceArtifactoryPasswordSecret }} "$PROMOTE_SOURCE_LOGIN_URL"
+          fi
+
+          docker pull $promoteSource
+          docker image tag $promoteSource $REGISTRY_URL:$promoteTag
+          docker push $REGISTRY_URL:$promoteTag
+          echo "BUILD_TAG=$promoteTag"  >> "$GITHUB_ENV"
+        
+
+          
+          
+
+     
