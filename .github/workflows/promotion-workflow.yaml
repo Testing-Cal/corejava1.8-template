@@ -70,9 +70,7 @@ jobs:
 
       - name: Artifact Promotion 
         run: |
-          docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }} "$REGISTRY_URL"
-          docker push "$REGISTRY_URL:$BUILD_TAG"
-          docker push "$REGISTRY_URL:latest"
+          docker login -u ${{ secrets.ArtifactoryUserSecret }} -p ${{ secrets.ArtifactoryPasswordSecret }} "$REGISTRY_URL"
          
           PROMOTE_SOURCE_LOGIN_URL=$(echo "$promoteSource" | cut -d'/' -f1)
           if [[ $promoteSourceArtifactoryType == "ECR" ]]
@@ -90,7 +88,35 @@ jobs:
           docker image tag $promoteSource $REGISTRY_URL:$promoteTag
           docker push $REGISTRY_URL:$promoteTag
           echo "BUILD_TAG=$promoteTag"  >> "$GITHUB_ENV"
-        
+          
+      - name: Deploy to Kubernetes
+        run: | 
+           docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" $KUBECTL_IMAGE_VERSION create ns "$namespace_name" || true
+           if [[ $DEPLOYMENT_TYPE == 'OPENSHIFT' ]]
+              COUNT=$(grep 'serviceAccount' Helm.yaml | wc -l)
+              if [[ $COUNT -gt 0 ]]
+              then
+                  ACCOUNT=$(grep 'serviceAccount:' Helm.yaml | tail -n1 | awk '{ print $2}')
+                  echo $ACCOUNT
+              else
+                  ACCOUNT='default'
+              fi
+              docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" -v "$WORKSPACE":/apps -w /apps $OC_IMAGE_VERSION oc adm policy add-scc-to-user anyuid -z $ACCOUNT -n "$namespace_name"
+           fi
+           
+           JFROG_LOGIN_URL=$(echo "$REGISTRY_URL" | cut -d'/' -f1)
+            
+           ## hardcoded name regcred need to be change
+           docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" $KUBECTL_IMAGE_VERSION -n "$namespace_name" delete secret regcred --ignore-not-found || true
+           docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" $KUBECTL_IMAGE_VERSION -n "$namespace_name" create secret docker-registry regcred --docker-server="$JFROG_LOGIN_URL" --docker-username="$USERNAME" --docker-password="$PASSWORD" || true
+                                               
+           # custom helm chart
+
+           echo "context: $CONTEXT" >> Helm.yaml
+           cat Helm.yaml
+           sed -i s+#SERVICE_NAME#+"$helmReleaseName"+g ./helm_chart/values.yaml ./helm_chart/Chart.yaml
+           docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" -v "$WORKSPACE":/apps -w /apps $HELM_IMAGE_VERSION upgrade --install "$helmReleaseName" -n "$namespace_name" helm_chart --atomic --timeout 300s --set image.repository="$REGISTRY_URL" --set image.tag="$BUILD_TAG" --set image.registrySecret="regcred"  --set service.internalport="$SERVICE_PORT" -f Helm.yaml
+
 
           
           
