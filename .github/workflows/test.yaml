@@ -22,7 +22,8 @@ jobs:
       KUBECTL_IMAGE_VERSION: "bitnami/kubectl:1.28" #https://hub.docker.com/r/bitnami/kubectl/tags
       HELM_IMAGE_VERSION: "alpine/helm:3.8.1" #https://hub.docker.com/r/alpine/helm/tags
       OC_IMAGE_VERSION: "quay.io/openshift/origin-cli:4.9.0" #https://quay.io/repository/openshift/origin-cli?tab=tags
-      IMAGE_DETAILS: "nginx:latest"
+      REGISTRY_URL: "abhijeetka/kong-injector"
+      BUILD_TAG: "v1.0.0"
     
 
     steps:
@@ -43,6 +44,7 @@ jobs:
         run: echo "$CONTAINER_SCAN_TYPE"
 
       - name: Setup JFrog CLI
+        if: env.CONTAINER_SCAN_TYPE == 'XRAY'
         uses: jfrog/setup-jfrog-cli@v4
         env:
           JF_URL: ${{ secrets.JFROG_URL }}
@@ -50,9 +52,7 @@ jobs:
 
       - name: Container Image Scan
         if: env.CONTAINER_SCAN_TYPE == 'XRAY'
-        run: |
-          echo "Here we are going to scan Jfrog Xray"
-          jf docker scan abhijeetka/kong-injector:v1.0.0
+        run: jf docker scan $REGISTRY_URL:$BUILD_TAG
           
           
       
