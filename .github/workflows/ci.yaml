@@ -72,7 +72,7 @@ jobs:
           
       - name: Publish Container Image
         run: |
-          docker login -u ${{ secrets.${ArtifactoryUserSecret} }} -p ${{ secrets.${ArtifactoryPasswordSecret} }} "$REGISTRY_URL"
+          docker login -u ${{ secrets.[$ArtifactoryUserSecret] }} -p ${{ secrets.[$ArtifactoryPasswordSecret] }} "$REGISTRY_URL"
           docker push "$REGISTRY_URL:$BUILD_TAG"
           docker push "$REGISTRY_URL:latest"
 
