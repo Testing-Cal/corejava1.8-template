@@ -60,7 +60,7 @@ jobs:
 
          
           echo "HELM_REPO_PATH=$(echo "$helmRepoUrl" | cut -d'/' -f4-5 | sed 's/.git$//')" >> "$GITHUB_ENV"
-          echo "Extracted Repository Path: $REPO_PATH"
+         
           
 
           echo "$JSON_STRING" | jq -r '.kubernetes' | yq -P > Helm.yaml
