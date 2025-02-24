@@ -54,6 +54,9 @@ jobs:
           echo "helmReleaseName=$(echo "$JSON_STRING" | jq -r '.general.helmReleaseName')" >> "$GITHUB_ENV"
           echo "namespace_name=$(echo "$JSON_STRING" | jq -r '.kubernetes.namespace')" >> "$GITHUB_ENV"
           echo "helmRepoUrl=$(echo "$JSON_STRING" | jq -r '.helm.helmRepoUrl')" >> "$GITHUB_ENV"
+          echo "helmWorkingDirectory=$(echo "$JSON_STRING" | jq -r '.helm.workingDirectory')" >> "$GITHUB_ENV"
+          echo "helmvaluesPath=$(echo "$JSON_STRING" | jq -r '.helm.values')" >> "$GITHUB_ENV"
+
 
           echo "$JSON_STRING" | jq -r '.kubernetes' | yq -P > Helm.yaml
           #echo "$JSON_STRING" | jq -r '.kubernetes.vault' | yq -P > Vault.yaml    
@@ -91,6 +94,26 @@ jobs:
            docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" $KUBECTL_IMAGE_VERSION -n "$namespace_name" create secret docker-registry regcred --docker-server="$JFROG_LOGIN_URL" --docker-username="$USERNAME" --docker-password="$PASSWORD" || true
                                                
            # custom helm chart
+           if [[ $helmRepoUrl != null && $helmRepoUrl != '' ]]
+           then
+             mkdir customChart
+             cd customChart
+             
+             echo "helmRepoUrl=$(echo "$JSON_STRING" | jq -r '.helm.helmRepoUrl')" >> "$GITHUB_ENV"
+           if (helmVars.helmRepoUrl != null && helmVars.helmRepoUrl != '') {
+                                              env.temp_workingDirectory = "${helmVars.workingDirectory}"
+                                              env.helmvalues = "${helmVars.values}"
+                                              dir('externalChart') {
+                                                  checkout([$class: 'GitSCM', branches: [[name: "${helmVars.helmRepoBranch}"]], userRemoteConfigs: [[url: "${helmVars.helmRepoUrl}", credentialsId: scm.userRemoteConfigs[0].credentialsId]]])
+                                                  sh '''
+                                                  ### Command for running External helm Chart
+                                                   docker run --rm  --user root -v "$KUBECONFIG":"$KUBECONFIG" -e KUBECONFIG="$KUBECONFIG" -v "$WORKSPACE":/apps -w /apps/externalChart $HELM_IMAGE_VERSION upgrade --install "$helmReleaseName" -n "$namespace_name" "$temp_workingDirectory" --atomic --timeout 300s --set image.repository="$REGISTRY_URL" --set image.tag="$BUILD_TAG" --set image.registrySecret="$kube_secret_name_for_registry"  --set service.internalport="$SERVICE_PORT" --set context="$CONTEXT" -f "$helmvalues" -f ../vault.yaml
+                                                  '''
+
+                                              }
+
+                                           }
+
 
            echo "context: $CONTEXT" >> Helm.yaml
            cat Helm.yaml
