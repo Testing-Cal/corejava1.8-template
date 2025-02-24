@@ -52,7 +52,7 @@ jobs:
         if: env.CONTAINER_SCAN_TYPE == 'XRAY'
         run: |
           echo "Here we are going to scan Jfrog Xray"
-          jf docker scan abhijeetka/kong-inector:v1.0.0
+          jf docker scan abhijeetka/kong-injector:v1.0.0
           
           
       
