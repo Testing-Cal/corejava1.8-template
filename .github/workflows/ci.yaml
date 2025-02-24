@@ -43,7 +43,7 @@ jobs:
           echo "SONAR_CREDENTIAL_ID=$(echo "$JSON_STRING" | jq -r '.general.sonarSecret')"  >> "$GITHUB_ENV"
           echo "ARTIFACTORY=$(echo "$JSON_STRING" | jq -r '.general.artifactory')"  >> "$GITHUB_ENV"
           echo "STAGE_FLAG=$(echo "$JSON_STRING" | jq -r '.general.stageFlag')"  >> "$GITHUB_ENV"
-          echo "CONTAINERSCANTYPE=$(echo "$JSON_STRING" | jq -r '.general.containerScanType')"  >> "$GITHUB_ENV"
+          echo "CONTAINER_SCAN_TYPE=$(echo "$JSON_STRING" | jq -r '.general.containerScanType')"  >> "$GITHUB_ENV"
           echo "DOCKERHOST=$(echo "$JSON_STRING" | jq -r '.general.dockerHostIP')"  >> "$GITHUB_ENV"
           echo "RELEASE_NAME=$(echo "$JSON_STRING" | jq -r '.general.name')"  >> "$GITHUB_ENV"
           echo "CONTEXT=$(echo "$JSON_STRING" | jq -r '.general.contextPath')" >> "$GITHUB_ENV"
@@ -52,7 +52,7 @@ jobs:
           echo "sonar_project_key=$(echo "$JSON_STRING" | jq -r '.general.sonarProjectKey')" >> "$GITHUB_ENV"
           echo "ArtifactoryUserSecret=$(echo "$JSON_STRING" | jq -r '.general.ArtifactoryUserSecret')" >> "$GITHUB_ENV"
           echo "ArtifactoryPasswordSecret=$(echo "$JSON_STRING" | jq -r '.general.ArtifactoryPasswordSecret')" >> "$GITHUB_ENV"
-      
+          echo "DOCKER_LOGIN_URL=$(echo "$REGISTRY_URL" | cut -d'/' -f1)" >> "$GITHUB_ENV"
 
       - name: Unit Test
         run: |
@@ -69,6 +69,17 @@ jobs:
       - name: Build Container Image
         run: |
           docker build -t "$REGISTRY_URL:$BUILD_TAG" -t "$REGISTRY_URL:latest" .
+      
+      - name: Setup JFrog CLI
+        if: env.CONTAINER_SCAN_TYPE == 'XRAY'
+        uses: jfrog/setup-jfrog-cli@v4
+        env:
+          JF_URL: $DOCKER_LOGIN_URL
+          JF_ACCESS_TOKEN: ${{ secrets[env.ArtifactoryPasswordSecret] }}
+
+      - name: Container Image Scan
+        if: env.CONTAINER_SCAN_TYPE == 'XRAY'
+        run: jf docker scan $REGISTRY_URL:$BUILD_TAG
           
       - name: Publish Container Image
         run: |
