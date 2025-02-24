@@ -42,11 +42,17 @@ jobs:
       - name: Print ContainerScanType
         run: echo "$CONTAINER_SCAN_TYPE"
 
+      - name: Setup JFrog CLI
+        uses: jfrog/setup-jfrog-cli@v4
+        env:
+          JF_URL: ${{ secrets.JFROG_URL }}
+          JF_ACCESS_TOKEN: ${{ secrets.JFROG_TOKEN }}
+
       - name: Container Image Scan
         if: env.CONTAINER_SCAN_TYPE == 'XRAY'
         run: |
           echo "Here we are going to scan Jfrog Xray"
-          docker run --rm releases-docker.jfrog.io/jfrog/jfrog-cli-v2-jf \
-          jf 'docker scan $IMAGE_DETAILS' --access-token ${{ secrets.JFROG_TOKEN }} --url ${{ secrets.JFROG_URL }} --user ${{ secrets.JFROG_USER }}
+          jf docker scan nginx:latest
+          
           
       
