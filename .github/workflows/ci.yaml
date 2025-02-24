@@ -54,6 +54,7 @@ jobs:
           echo "ArtifactoryUserSecret=$(echo "$JSON_STRING" | jq -r '.general.ArtifactoryUserSecret')" >> "$GITHUB_ENV"
           echo "ArtifactoryPasswordSecret=$(echo "$JSON_STRING" | jq -r '.general.ArtifactoryPasswordSecret')" >> "$GITHUB_ENV"
           echo "ARTIFACTORY_URL=$(echo "$JSON_STRING" | jq -r '.general.ArtifactoryURL')" >> "$GITHUB_ENV"
+          echo "DOCKER_LOGIN_URL=$(echo "$REGISTRY_URL" | cut -d'/' -f1)" >> "$GITHUB_ENV"
 
       - name: Unit Test
         run: |
@@ -85,7 +86,16 @@ jobs:
           
       - name: Publish Container Image
         run: |
-          docker login -u ${{ secrets[env.ArtifactoryUserSecret] }} -p ${{ secrets[env.ArtifactoryPasswordSecret] }} "$REGISTRY_URL"
+          if [[ $ARTIFACTORY == "ECR" ]]
+          then
+            ECR_REGION=$(echo "$REGISTRY_URL" | cut -d'.' -f4)
+            set +x 
+            AWS_ACCESS_KEY_ID=${{ secrets[env.ArtifactoryUserSecret] }} AWS_SECRET_ACCESS_KEY=${{ secrets[env.ArtifactoryPasswordSecret] }} aws ecr get-login-password --region "$ECR_REGION" | docker login --username AWS --password-stdin $DOCKER_LOGIN_URL 
+            set -x
+          else
+            docker login -u ${{ secrets[env.ArtifactoryUserSecret] }} -p ${{ secrets[env.ArtifactoryPasswordSecret] }} "$DOCKER_LOGIN_URL"
+          fi
+          
           docker push "$REGISTRY_URL:$BUILD_TAG"
           docker push "$REGISTRY_URL:latest"
 
