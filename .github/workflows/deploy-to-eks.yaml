@@ -55,16 +55,7 @@ jobs:
           echo "sonar_project_key=$(echo "$JSON_STRING" | jq -r '.general.sonarProjectKey')" >> "$GITHUB_ENV"
           echo "helmReleaseName=$(echo "$JSON_STRING" | jq -r '.general.helmReleaseName')" >> "$GITHUB_ENV"
           echo "namespace_name=$(echo "$JSON_STRING" | jq -r '.kubernetes.namespace')" >> "$GITHUB_ENV"
-          
-          echo "helmRepoUrl=$(echo "$JSON_STRING" | jq -r '.helm.helmRepoUrl')" >> "$GITHUB_ENV"
-          echo "helmWorkingDirectory=$(echo "$JSON_STRING" | jq -r '.helm.workingDirectory')" >> "$GITHUB_ENV"
-          echo "helmvaluesPath=$(echo "$JSON_STRING" | jq -r '.helm.values')" >> "$GITHUB_ENV"
-          echo "helmRepoBranch=$(echo "$JSON_STRING" | jq -r '.helm.helmRepoBranch')" >> "$GITHUB_ENV"
-
-         
-          echo "HELM_REPO_PATH=$(echo "$helmRepoUrl" | cut -d'/' -f4-5 | sed 's/.git$//')" >> "$GITHUB_ENV"
-          echo "Extracted Repository Path: $REPO_PATH"
-          
+          echo "DOCKER_LOGIN_URL=$(echo "$REGISTRY_URL" | cut -d'/' -f1)" >> "$GITHUB_ENV"
 
           echo "$JSON_STRING" | jq -r '.kubernetes' | yq -P > Helm.yaml
           #echo "$JSON_STRING" | jq -r '.kubernetes.vault' | yq -P > Vault.yaml    
@@ -85,7 +76,6 @@ jobs:
           echo "${{ env.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config
 
           
-    
       - name: Deploy to Kubernetes
         run: |
            
@@ -102,32 +92,14 @@ jobs:
               docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" -v "$WORKSPACE":/apps -w /apps $OC_IMAGE_VERSION oc adm policy add-scc-to-user anyuid -z $ACCOUNT -n "$namespace_name"
            fi
            
-           JFROG_LOGIN_URL=$(echo "$REGISTRY_URL" | cut -d'/' -f1)
             
            ## hardcoded name regcred need to be change
            docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" $KUBECTL_IMAGE_VERSION -n "$namespace_name" delete secret regcred --ignore-not-found || true
-           docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" $KUBECTL_IMAGE_VERSION -n "$namespace_name" create secret docker-registry regcred --docker-server="$JFROG_LOGIN_URL" --docker-username="$USERNAME" --docker-password="$PASSWORD" || true
+           docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" $KUBECTL_IMAGE_VERSION -n "$namespace_name" create secret docker-registry regcred --docker-server="$DOCKER_LOGIN_URL" --docker-username=${{ secrets[env.ArtifactoryUserSecret] }} --docker-password=${{ secrets[env.ArtifactoryPasswordSecret] }} || true
                                                
-           # custom helm chart
-           if [[ $helmRepoUrl != null && $helmRepoUrl != '' ]]
-           then
-             cd external_helm
-             docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" -v "$WORKSPACE":/apps -w /apps/external_helm $HELM_IMAGE_VERSION upgrade --install "$helmReleaseName" -n "$namespace_name" "$helmWorkingDirectory" --atomic --timeout 300s --set image.repository="$REGISTRY_URL" --set image.tag="$BUILD_TAG" --set image.registrySecret="regcred"  --set service.internalport="$SERVICE_PORT" --set context="$CONTEXT" -f "$helmvalues" -f ../vault.yaml
-             
-            
-
-
            echo "context: $CONTEXT" >> Helm.yaml
            cat Helm.yaml
            sed -i s+#SERVICE_NAME#+"$helmReleaseName"+g ./helm_chart/values.yaml ./helm_chart/Chart.yaml
            docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" -v "$WORKSPACE":/apps -w /apps $HELM_IMAGE_VERSION upgrade --install "$helmReleaseName" -n "$namespace_name" helm_chart --atomic --timeout 300s --set image.repository="$REGISTRY_URL" --set image.tag="$BUILD_TAG" --set image.registrySecret="regcred"  --set service.internalport="$SERVICE_PORT" -f Helm.yaml
 
            
-
-    
-          
-      - name: Publish Container Image
-        run: |
-          docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }} "$REGISTRY_URL"
-          #docker push "$REGISTRY_URL:$BUILD_TAG"
-          #docker push "$REGISTRY_URL:latest"
