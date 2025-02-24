@@ -42,31 +42,24 @@ jobs:
          
           echo "REGISTRY_URL=$(echo "$JSON_STRING" | jq -r '.general.containerImagePath')" >> "$GITHUB_ENV"
           echo "BUILD_TAG=$(echo "$JSON_STRING" | jq -r '.general.containerImageTag')"  >> "$GITHUB_ENV"
-          echo "ARTIFACTORY_CREDENTIALS=$(echo "$JSON_STRING" | jq -r '.general.artifactorySecret')"  >> "$GITHUB_ENV"
-          echo "SONAR_CREDENTIAL_ID=$(echo "$JSON_STRING" | jq -r '.general.sonarSecret')"  >> "$GITHUB_ENV"
+          
+
           echo "ARTIFACTORY=$(echo "$JSON_STRING" | jq -r '.general.artifactory')"  >> "$GITHUB_ENV"
-          echo "STAGE_FLAG=$(echo "$JSON_STRING" | jq -r '.general.stageFlag')"  >> "$GITHUB_ENV"
-          echo "CONTAINERSCANTYPE=$(echo "$JSON_STRING" | jq -r '.general.containerScanType')"  >> "$GITHUB_ENV"
+   
           echo "DOCKERHOST=$(echo "$JSON_STRING" | jq -r '.general.dockerHostIP')"  >> "$GITHUB_ENV"
           echo "RELEASE_NAME=$(echo "$JSON_STRING" | jq -r '.general.name')"  >> "$GITHUB_ENV"
           echo "CONTEXT=$(echo "$JSON_STRING" | jq -r '.general.contextPath')" >> "$GITHUB_ENV"
-          echo "sonar_org=$(echo "$JSON_STRING" | jq -r '.general.sonarOrg')" >> "$GITHUB_ENV"
-          echo "sonar_host=$(echo "$JSON_STRING" | jq -r '.general.sonarHost')" >> "$GITHUB_ENV"
-          echo "sonar_project_key=$(echo "$JSON_STRING" | jq -r '.general.sonarProjectKey')" >> "$GITHUB_ENV"
+          
           echo "helmReleaseName=$(echo "$JSON_STRING" | jq -r '.general.helmReleaseName')" >> "$GITHUB_ENV"
           echo "namespace_name=$(echo "$JSON_STRING" | jq -r '.kubernetes.namespace')" >> "$GITHUB_ENV"
+          echo "ArtifactoryUserSecret=$(echo "$JSON_STRING" | jq -r '.general.ArtifactoryUserSecret')" >> "$GITHUB_ENV"
+          echo "ArtifactoryPasswordSecret=$(echo "$JSON_STRING" | jq -r '.general.ArtifactoryPasswordSecret')" >> "$GITHUB_ENV"
           echo "DOCKER_LOGIN_URL=$(echo "$REGISTRY_URL" | cut -d'/' -f1)" >> "$GITHUB_ENV"
+          
 
           echo "$JSON_STRING" | jq -r '.kubernetes' | yq -P > Helm.yaml
           #echo "$JSON_STRING" | jq -r '.kubernetes.vault' | yq -P > Vault.yaml    
           
-      - name: Checkout External Helm Chart Repo
-        uses: actions/checkout@v2
-        with:
-          repository: $HELM_REPO_PATH
-          ref: $helmRepoBranch
-          path: ./external_helm
-      
 
       - name: Configure Kubeconfig File
         env:
@@ -93,10 +86,13 @@ jobs:
            fi
            
             
-           ## hardcoded name regcred need to be change
-           docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" $KUBECTL_IMAGE_VERSION -n "$namespace_name" delete secret regcred --ignore-not-found || true
-           docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" $KUBECTL_IMAGE_VERSION -n "$namespace_name" create secret docker-registry regcred --docker-server="$DOCKER_LOGIN_URL" --docker-username=${{ secrets[env.ArtifactoryUserSecret] }} --docker-password=${{ secrets[env.ArtifactoryPasswordSecret] }} || true
-                                               
+           if [[ $ARTIFACTORY != "ECR" ]]
+           then
+             ## hardcoded name regcred need to be change
+             docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" $KUBECTL_IMAGE_VERSION -n "$namespace_name" delete secret regcred --ignore-not-found || true
+             docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" $KUBECTL_IMAGE_VERSION -n "$namespace_name" create secret docker-registry regcred --docker-server="$DOCKER_LOGIN_URL" --docker-username=${{ secrets[env.ArtifactoryUserSecret] }} --docker-password=${{ secrets[env.ArtifactoryPasswordSecret] }} || true
+           fi
+            
            echo "context: $CONTEXT" >> Helm.yaml
            cat Helm.yaml
            sed -i s+#SERVICE_NAME#+"$helmReleaseName"+g ./helm_chart/values.yaml ./helm_chart/Chart.yaml
