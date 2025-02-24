@@ -24,6 +24,7 @@ jobs:
       OC_IMAGE_VERSION: "quay.io/openshift/origin-cli:4.9.0" #https://quay.io/repository/openshift/origin-cli?tab=tags
       REGISTRY_URL: "abhijeetka/kong-injector"
       BUILD_TAG: "v1.0.0"
+      SECRET_NAME: "JFROG_URL"
     
 
     steps:
@@ -47,7 +48,7 @@ jobs:
         if: env.CONTAINER_SCAN_TYPE == 'XRAY'
         uses: jfrog/setup-jfrog-cli@v4
         env:
-          JF_URL: ${{ secrets.JFROG_URL }}
+          JF_URL: ${{ secrets[env.SECRET_NAME] }}
           JF_ACCESS_TOKEN: ${{ secrets.JFROG_TOKEN }}
 
       - name: Container Image Scan
