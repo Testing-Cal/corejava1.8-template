@@ -27,6 +27,7 @@ jobs:
       KUBECTL_IMAGE_VERSION: "bitnami/kubectl:1.28" #https://hub.docker.com/r/bitnami/kubectl/tags
       HELM_IMAGE_VERSION: "alpine/helm:3.8.1" #https://hub.docker.com/r/alpine/helm/tags
       OC_IMAGE_VERSION: "quay.io/openshift/origin-cli:4.9.0" #https://quay.io/repository/openshift/origin-cli?tab=tags
+      SONAR_IMAGE_VERSION: "sonarsource/sonar-scanner-cli:11.0"
 
 
     steps:
@@ -58,13 +59,14 @@ jobs:
         run: |
           docker run --rm -v "$GITHUB_WORKSPACE":/opt/repo -w /opt/repo $JAVA_MVN_IMAGE_VERSION ./mvnw test --batch-mode
 
-      - name: SonarQube Scan
-        run: |
-          docker run -v "$GITHUB_WORKSPACE":/app -w /app sonarsource/sonar-scanner-cli:11.0 -Dsonar.java.binaries='.' -Dsonar.exclusions='pom.xml, target/**/*' -Dsonar.projectKey="$sonar_project_key" -Dsonar.projectName="$sonar_project_key" -Dsonar.sources=src -Dsonar.host.url="$sonar_host" -Dsonar.organization="$sonar_org" -Dsonar.login=${{ secrets.TENANT950174_336451CB_B0FC_45E9_9F6E_D3F1E4704A3B_SONAR}} -Dsonar.token=${{ secrets.TENANT950174_336451CB_B0FC_45E9_9F6E_D3F1E4704A3B_SONAR}}
-
       - name: Build
         run: |
           docker run --rm -v "$GITHUB_WORKSPACE":/opt/repo -w /opt/repo $JAVA_MVN_IMAGE_VERSION ./mvnw clean install -Dmaven.test.skip=true
+
+
+      - name: SonarQube Scan
+        run: |
+          docker run -v "$GITHUB_WORKSPACE":/app -w /app "$SONAR_IMAGE_VERSION" -Dsonar.java.binaries='.' -Dsonar.exclusions='pom.xml, target/**/*' -Dsonar.projectKey="$sonar_project_key" -Dsonar.projectName="$sonar_project_key" -Dsonar.sources=src -Dsonar.host.url="$sonar_host" -Dsonar.organization="$sonar_org" -Dsonar.login=${{ secrets.TENANT950174_336451CB_B0FC_45E9_9F6E_D3F1E4704A3B_SONAR}} -Dsonar.token=${{ secrets.TENANT950174_336451CB_B0FC_45E9_9F6E_D3F1E4704A3B_SONAR}}
 
       - name: Build Container Image
         run: |
@@ -74,7 +76,7 @@ jobs:
         if: env.CONTAINER_SCAN_TYPE == 'XRAY'
         uses: jfrog/setup-jfrog-cli@v4
         env:
-          JF_URL: "https://$DOCKER_LOGIN_URL"
+          JF_URL: "https://$DOCKER_LOGIN_URL" # Since the URL is extracted from Registry URL, requires https to be added
           JF_ACCESS_TOKEN: ${{ secrets[env.ArtifactoryPasswordSecret] }}
 
       - name: Container Image Scan
