@@ -23,7 +23,6 @@ jobs:
       name: 'dev'
       url: 'https://test.com'
     env:
-      JAVA_MVN_IMAGE_VERSION: "amazoncorretto:8-alpine" #https://hub.docker.com/_/maven/tags
       KUBECTL_IMAGE_VERSION: "bitnami/kubectl:1.28" #https://hub.docker.com/r/bitnami/kubectl/tags
       HELM_IMAGE_VERSION: "alpine/helm:3.8.1" #https://hub.docker.com/r/alpine/helm/tags
       OC_IMAGE_VERSION: "quay.io/openshift/origin-cli:4.9.0" #https://quay.io/repository/openshift/origin-cli?tab=tags
@@ -32,8 +31,6 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v2
-
-      
           
       - name: Initialization
         run: |
@@ -42,11 +39,7 @@ jobs:
          
           echo "REGISTRY_URL=$(echo "$JSON_STRING" | jq -r '.general.containerImagePath')" >> "$GITHUB_ENV"
           echo "BUILD_TAG=$(echo "$JSON_STRING" | jq -r '.general.containerImageTag')"  >> "$GITHUB_ENV"
-          
-
           echo "ARTIFACTORY=$(echo "$JSON_STRING" | jq -r '.general.artifactory')"  >> "$GITHUB_ENV"
-   
-          echo "DOCKERHOST=$(echo "$JSON_STRING" | jq -r '.general.dockerHostIP')"  >> "$GITHUB_ENV"
           echo "RELEASE_NAME=$(echo "$JSON_STRING" | jq -r '.general.name')"  >> "$GITHUB_ENV"
           echo "CONTEXT=$(echo "$JSON_STRING" | jq -r '.general.contextPath')" >> "$GITHUB_ENV"
           
@@ -56,7 +49,6 @@ jobs:
           echo "ArtifactoryPasswordSecret=$(echo "$JSON_STRING" | jq -r '.general.ArtifactoryPasswordSecret')" >> "$GITHUB_ENV"
           echo "DOCKER_LOGIN_URL=$(echo "$REGISTRY_URL" | cut -d'/' -f1)" >> "$GITHUB_ENV"
           
-
           echo "$JSON_STRING" | jq -r '.kubernetes' | yq -P > Helm.yaml
           #echo "$JSON_STRING" | jq -r '.kubernetes.vault' | yq -P > Vault.yaml    
           
