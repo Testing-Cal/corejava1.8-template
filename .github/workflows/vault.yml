@@ -56,6 +56,7 @@ jobs:
 
           # for Vault
           echo "VAULT_CONFIG_PRESENT=$(echo "$JSON_STRING" | jq '.docker.vault | has("type")')" >> "$GITHUB_ENV"
+          echo $VAULT_CONFIG_PRESENT
           if [[ $VAULT_CONFIG_PRESENT ]]; then
             echo "Vault configuration present"
           else
