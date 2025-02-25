@@ -1,9 +1,6 @@
 name: Qualys Scan Test
 
 on:
-  push:
-    branches:
-      - 'main'
   workflow_dispatch:
     inputs:
       github_metadata:
