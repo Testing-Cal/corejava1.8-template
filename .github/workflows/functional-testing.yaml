@@ -1,0 +1,169 @@
+name: deploy-to-eks
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_number:
+        default: '10'
+        type: string
+        required: true
+      k8s_namespace:
+        default: 'default'
+        type: string
+        required: true
+      github_metadata:
+        default: '{"general":{"name":"120ang17_CD","repoName":"120ang17","sonarProjectKey":"devsecops_120ang17","helmReleaseName":"a120ang17","contextPath":"/120nest10","sonarHost":"https://sonarqube.tenant604134.ibdp.calibo.com","tenant":"Tenant950174","lazsaDomainUri":"https://lazsa-dis.calibo.com","devopsSettingId":"3c7e6b67-e0bc-4bb7-9260-9f9e7bad20b8","agentApiKey":"zMhoTfcHkPZb4XM2z7TdmFj8iql6P0buiq8IWNw2oegAQdhejQ mlaPLjpMkhxeOVQ3 LGdLan lmyXXsSnky xRw88dkWnBnJh6yytW55zcV0jby8DpKBva3hGKHMLZBXvyK/3zk9koZ GROkHexHAGocsxhCmzuzXMUffFajSSvjB3nHWekvbfs5AtxQM5vKIy/PJOZHaSUjAoXWKRF6K8hkLCBu2OksPXRE1DSao=","agentId":"d32f0932-76e1-41d8-a7ca-e5f424544a79","orchCertCredentialId":"","sonarOrg":"default-organization","artifactory":"JFROG","artifactorySecret":"Tenant950174-38f4e023-93dc-4fec-851b-b6db3317356d-JFROG","kubernetesSecret":"Tenant950174-b75b4b82-5648-403e-9c76-79389f2ee7fb","containerScanType":"","dynamicJenkinsStage":"false","stageFlag":"{\"sonarScan\":true,\"zapScan\":false,\"containerScan\":false,\"qualysScan\":false,\"FunctionalTesting\":false}","dockerHostIP":"","containerImagePath":"artifactory.tenant604134.ibdp.calibo.com/towerofgods-docker-albstagelevel-local/godsslayer/120ang17","containerImageTag":"latest","sonarSecret":"Tenant950174-336451cb-b0fc-45e9-9f6e-d3f1e4704a3b-sonar","artifactPublish":false},"docker":{"appPort":"4200","hostPort":"4200"},"helm":{"additionalArguments":"","additionalFiles":"","workingDirectory":"helm_chart","namespace":"dev4","type":"lazsa","values":""},"kubernetes":{"namespace":"dev4","replicaCount":"1","resources":{"limits":{"cpu":"500m","memory":"512Mi"},"requests":{"cpu":"200m","memory":"256Mi"}},"ingress":{"enabled":true,"paths":{"path":"/120nest10"},"hosts":["alb1.tenant621248.ibdp.calibo.com"],"ingressClass":"alb","controllerType":"alb","albExtraAnnotations":{"alb.ingress.kubernetes.io/group.name":"newalb"}},"service":{"type":"ClusterIP"}}}'
+        type: string
+        required: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: 'dev'
+      url: 'https://test.com'
+    env:
+      KUBECTL_IMAGE_VERSION: "bitnami/kubectl:1.28" #https://hub.docker.com/r/bitnami/kubectl/tags
+      HELM_IMAGE_VERSION: "alpine/helm:3.8.1" #https://hub.docker.com/r/alpine/helm/tags
+      OC_IMAGE_VERSION: "quay.io/openshift/origin-cli:4.9.0" #https://quay.io/repository/openshift/origin-cli?tab=tags
+
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+          
+      - name: Initialization
+        run: |
+          sudo apt install yq -y 
+          JSON_STRING='${{ inputs.github_metadata }}'
+         
+          echo "REGISTRY_URL=$(echo "$JSON_STRING" | jq -r '.general.containerImagePath')" >> "$GITHUB_ENV"
+          echo "BUILD_TAG=$(echo "$JSON_STRING" | jq -r '.general.containerImageTag')"  >> "$GITHUB_ENV"
+          echo "ARTIFACTORY=$(echo "$JSON_STRING" | jq -r '.general.artifactory')"  >> "$GITHUB_ENV"
+          echo "RELEASE_NAME=$(echo "$JSON_STRING" | jq -r '.general.name')"  >> "$GITHUB_ENV"
+          echo "CONTEXT=$(echo "$JSON_STRING" | jq -r '.general.contextPath')" >> "$GITHUB_ENV"
+          
+          echo "helmReleaseName=$(echo "$JSON_STRING" | jq -r '.general.helmReleaseName')" >> "$GITHUB_ENV"
+          echo "namespace_name=$(echo "$JSON_STRING" | jq -r '.kubernetes.namespace')" >> "$GITHUB_ENV"
+          echo "ArtifactoryUserSecret=$(echo "$JSON_STRING" | jq -r '.general.ArtifactoryUserSecret')" >> "$GITHUB_ENV"
+          echo "ArtifactoryPasswordSecret=$(echo "$JSON_STRING" | jq -r '.general.ArtifactoryPasswordSecret')" >> "$GITHUB_ENV"
+          echo "DOCKER_LOGIN_URL=$(echo "$REGISTRY_URL" | cut -d'/' -f1)" >> "$GITHUB_ENV"
+          
+          echo "$JSON_STRING" | jq -r '.kubernetes' | yq -P > Helm.yaml
+          #echo "$JSON_STRING" | jq -r '.kubernetes.vault' | yq -P > Vault.yaml    
+          
+
+      - name: Checkout External Helm Chart Repo
+        uses: actions/checkout@v2
+        with:
+          repository: $HELM_REPO_PATH
+          ref: $helmRepoBranch
+          path: ./external_helm
+          
+      - name: functional testing
+        run: |
+        
+          dir('testcaseRepo') {
+                                    checkoutRepository()
+                                    if (env.TESTINGTOOLTYPE == 'selenium') {
+                                        runSeleniumTest()
+                                        publishResults('', 'target/surefire-reports/index.html', 'Selenium Test Report', 'Selenium Test Report')
+                                        testngPublishResults()
+                                    } else if (env.TESTINGTOOLTYPE == 'cypress') {
+                                        runCypressTest()
+                                        publishResults('mochawesome-report', 'output.html', 'Cypress Test Report', 'Cypress Test Report')
+                                    }
+                                }
+
+          def checkoutRepository() {
+  sh '''sudo chown -R `id -u`:`id -g` "$WORKSPACE" '''
+
+  checkout([
+    $class: 'GitSCM',
+    branches: [[name: env.TESTCASEREPOSITORYBRANCH]],
+    doGenerateSubmoduleConfigurations: false,
+    extensions: [[$class: 'CleanCheckout']],
+    submoduleCfg: [],
+    userRemoteConfigs: [[credentialsId: env.SOURCECODECREDENTIALID,url: env.TESTCASEREPOSITORYURL]]
+  ])
+}
+
+
+def getApplicationUrl(){
+  def host
+  if (env.DEPLOYMENT_TYPE == 'KUBERNETES'){
+    kubernetesJsonString = parseJsonString(env.JENKINS_METADATA,'kubernetes')
+    ingressJsonString = parseJsonString(kubernetesJsonString,'ingress')
+    ingress = parseJsonArray(ingressJsonString)
+    if(ingress['hosts']){
+      hostname = ingress.hosts[0]
+      print("hostname:"+hostname)
+      host = hostname
+    }
+    else{
+      host = metadataVars.ingressAddress
+    }
+    print("host in kubernetes:"+host)
+  }
+  else if(env.DEPLOYMENT_TYPE == 'EC2') {
+    dockerProperties = parseJsonString(env.JENKINS_METADATA, 'docker')
+    dockerData = parseJsonArray(dockerProperties)
+    host = DOCKERHOST+':'+dockerData.hostPort
+    print("host in ec2:"+host)
+  }
+  print("SITE_URL under test: http://${host}$CONTEXT/")
+  return host;
+}
+
+def runSeleniumTest() {
+  def host = getApplicationUrl()
+  sh env.TESTCASECOMMAND + " -DSITE_URL=http://${host}$CONTEXT/ > maven_test.out || true "
+  sh 'cat maven_test.out'
+  sh script: """
+             #!/bin/bash
+             cat maven_test.out | egrep "^\\[(INFO|ERROR)\\] Tests run: [0-9]+, Failures: [0-9]+, Errors: [0-9]+, Skipped: [0-9]+\$" | cut -c 8- | awk 'BEGIN { for(i=1;i<=5;i++) printf "*+"; } {printf "%s",\$0 } END { for(i=1;i<=5;i++) printf "*+"; }'
+             """
+}
+
+
+def runCypressTest() {
+  def host = getApplicationUrl()
+
+  sh """
+  cat <<EOL > test.sh
+  #!/bin/bash
+
+  rm -rf node_modules/ mochawesome-report/ cypress/videos/ /cypress/screenshots/
+  apt-get update
+  apt-get install -y libgbm-dev
+  npm install --save-dev mochawesome
+  npm install mochawesome-merge --save-dev
+  npm install
+
+  case "$env.TESTCASECOMMAND" in
+    *env*)
+        # Do stuff
+        echo 'case env'
+        $env.TESTCASECOMMAND applicationUrl=http://${host}$CONTEXT/ --browser $env.BROWSERTYPE --reporter mochawesome --reporter-options overwrite=false,html=false,json=true,charts=true
+        ;;
+    *)
+        echo 'case else'
+        $env.TESTCASECOMMAND -- --env applicationUrl=http://${host}$CONTEXT/ --browser $env.BROWSERTYPE --reporter mochawesome --reporter-options overwrite=false,html=false,json=true,charts=true
+        ;;
+  esac
+  npx mochawesome-merge mochawesome-report/*.json > mochawesome-report/output.json
+  npx marge mochawesome-report/output.json mochawesome-report  ./ --inline
+
+  EOL
+  """
+  sh 'docker run -v "$WORKSPACE"/testcaseRepo:/app -w /app cypress/browsers:node14.19.0-chrome100-ff99-edge /bin/sh test.sh > test.out || true'
+  sh 'cat test.out'
+  sh """
+ awk 'BEGIN { for(i=1;i<=5;i++) printf "*+"; } /(^[ ]*✖.+(failed|pended|pending|skipped|skipping)|^[ ]*✔[ ]+All specs passed).+/ {for(i=4;i>=0;i--) switch (i) {case 4: if( \$(NF-i) ~ /^[0-9]/ ){printf aggr "Tests run: "\$(NF-i) aggr ", ";} else{printf "Tests run: 0, " ;}  break; case 3: if( \$(NF-i) ~ /^[0-9]/ ){printf aggr "Passed: "\$(NF-i) aggr ", "} else{printf "Passed: 0, "} break; case 2: if( \$(NF-i) ~ /^[0-9]/ ){printf aggr "Failures: " \$(NF-i) aggr ", "} else{printf "Failures: 0, "}  break; case 1: if( \$(NF-i) ~ /^[0-9]/ ){printf aggr "Pending: " \$(NF-i) aggr ", "} else{printf "Pending: 0, "} break; case 0: if( \$(NF-i) ~ /^[0-9]/ ){printf aggr "Skipped: " \$(NF-i)} else{printf "Skipped: 0"} break; }} END { for(i=1;i<=5;i++) printf "*+"; }' test.out
+  """
+  sh 'pwd'
+}
+
+          
+      
+           
