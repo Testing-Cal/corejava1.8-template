@@ -55,7 +55,7 @@ jobs:
           echo "DOCKER_LOGIN_URL=$(echo "$REGISTRY_URL" | cut -d'/' -f1)" >> "$GITHUB_ENV"
 
           # for Vault
-          echo "VAULT_CONFIG_PRESENT=$(echo "$JSON_STRING" | jq 'has("docker") and .docker | has("vault")')" >> "$GITHUB_ENV"
+          echo "VAULT_CONFIG_PRESENT=$(echo "$JSON_STRING" | jq '.docker | has("vault")')" >> "$GITHUB_ENV"
           if [[ $VAULT_CONFIG_PRESENT ]]; then
             echo "Vault configuration present"
           else
