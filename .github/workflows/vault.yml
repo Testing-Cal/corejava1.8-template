@@ -82,15 +82,15 @@ jobs:
 
       - name: Injects Secrets 
         run: |
-          touch sec_values.json
+          touch sec_values.json final_value.env
           echo '${{ toJson(steps.read-secrets.outputs) }}' >> sec_values.json
-          jq -r 'to_entries | map("\(.key)=\(.value|tostring)") | .[]' sec_values.json > env.list
           echo $VAULT_SECRETS_KEYS 
           echo "$VAULT_SECRETS_KEYS" | jq -c '.[]'  | while read item; do
                   envVariable=$(echo "$item" | jq -r '.envVariable')
                   vaultKey=$(echo "$item" | jq -r '.vaultKey')
-                  echo $envVariable
                   ACTUAL_KEY="CAL_${vaultKey}"
-                  echo $ACTUAL_KEY
+                  VALUE=$(echo '${{ toJson(steps.read-secrets.outputs) }}' | jq --arg key $ACTUAL_KEY '.[$key]' )
+                  echo "${envVariable}=${VALUE}" >> final_value.env         
           done
+          cat final_value.env
 
