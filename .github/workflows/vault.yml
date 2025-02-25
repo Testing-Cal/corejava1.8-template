@@ -56,12 +56,11 @@ jobs:
 
           # for Vault
           echo "VAULT_CONFIG_PRESENT=$(echo "$JSON_STRING" | jq 'has("docker") and .docker | has("vault")')
-          if $VAULT_CONFIG_PRESENT; then
+          if [[ $VAULT_CONFIG_PRESENT ]]; then
             echo "Vault configuration present"
           else
             echo "Vault Configuration not present."
           fi
-          exit(1);
 
       - name: Inject Secret
         id: import-secrets
