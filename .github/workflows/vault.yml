@@ -63,3 +63,8 @@ jobs:
           secrets: |
             kv/data/dev/apps/service01 appkey | TEST_APP_KEY ;
             kv/data/dev/apps/service01 apptoken | TEST_APP_TOKEN ;
+
+      - name: Print Secret
+        run: |
+          echo "${{ env.TEST_APP_KEY }}"
+          echo "${{ steps.import-secrets.outputs.TEST_APP_TOKEN }}"
