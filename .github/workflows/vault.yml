@@ -83,6 +83,6 @@ jobs:
         run: |
           touch sec_values.json
           echo '${{ toJson(steps.read-secrets.outputs) }}' >> sec_values.json
-          jq -r 'to_entries | map("\(.key)=\(.value)") | .[]' sec_values.json > env.list
+          jq -r 'to_entries | map("\(.key)=\(.value|tostring)") | .[]' sec_values.json > env.list
           echo env.list
 
