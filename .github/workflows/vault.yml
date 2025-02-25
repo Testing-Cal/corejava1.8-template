@@ -61,7 +61,7 @@ jobs:
             echo "VAULT_TOKEN_SECRET=$(echo "$JSON_STRING" | jq -r '.docker.vault.configuration.vaultTokenSecret')" >> "$GITHUB_ENV"
             echo "VAULT_SECRETS_PATH=$(echo "$JSON_STRING" | jq -r '.docker.vault.secrets.path')" >> "$GITHUB_ENV"
             #echo "VAULT_SECRETS_KEYS=$(echo "$JSON_STRING" | jq -r '.docker.vault.secrets.secretValues')" >> "$GITHUB_ENV"
-            echo "VAULT_SECRETS_KEYS=$(echo "$JSON_STRING" | jq -r '.docker.vault.secrets.secretValues[] | "\(.envVariable)=\(.vaultKey)"' )" >> "$GITHUB_ENV"
+            echo "VAULT_SECRETS_KEYS=$(jq -c '.docker.vault.secrets.secretValues' "$JSON_STRING" )" >> "$GITHUB_ENV"
           else
             echo "No vault configuration found"
           fi
