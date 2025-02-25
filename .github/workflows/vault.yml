@@ -58,7 +58,7 @@ jobs:
           if echo "$JSON_STRING" | jq -e '.docker.vault | has("type")' > /dev/null; then
             echo "Vault configuration present"
             echo "VAULT_URL=$(echo "$JSON_STRING" | jq -r '.docker.vault.configuration.vaultUrl')" >> "$GITHUB_ENV"
-            echo "VAUTL_TOKEN_SECRET=$(echo "$JSON_STRING" | jq -r '.docker.vault.configuration.vaultTokenSecret')" >> "$GITHUB_ENV"
+            echo "VAULT_TOKEN_SECRET=$(echo "$JSON_STRING" | jq -r '.docker.vault.configuration.vaultTokenSecret')" >> "$GITHUB_ENV"
             
           else
             echo "No vault configuration found"
@@ -69,7 +69,7 @@ jobs:
         uses: hashicorp/vault-action@v2
         with:
           url: ${{ env.VAULT_URL }}
-          token: ${{ secrets[env.VAUTL_TOKEN_SECRET] }}
+          token: ${{ secrets[env.VAULT_TOKEN_SECRET] }}
           secrets: |
             kv/data/dev/apps/service01 appkey | TEST_APP_KEY ;
             kv/data/dev/apps/service01 apptoken | TEST_APP_TOKEN ;
