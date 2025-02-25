@@ -75,5 +75,5 @@ jobs:
 
       - name: Print Secret
         run: |
-          echo "${{ env.CAL_appkey }}"
-          echo "${{ steps.import-secrets.outputs.CAL_apptoken }}"
+          echo "${{ env.CAL_APPKEY }}"
+          echo "${{ steps.import-secrets.outputs.CAL_APPTOKEN }}"
