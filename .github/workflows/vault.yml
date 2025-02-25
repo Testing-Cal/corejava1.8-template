@@ -88,8 +88,9 @@ jobs:
           echo $VAULT_SECRETS_KEYS 
           echo "$VAULT_SECRETS_KEYS" | jq -c '.[]'  | while read item; do
                   envVariable=$(echo "$item" | jq -r '.envVariable')
-                  vaultKey=$(echo "$item" | jq -r '.vaultKey')"
+                  vaultKey=$(echo "$item" | jq -r '.vaultKey')
                   echo $envVariable
-                  echo "CAL_${vaultKey}"
+                  ACTUAL_KEY="CAL_${vaultKey}"
+                  echo $ACTUAL_KEY
           done
 
