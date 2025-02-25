@@ -53,3 +53,13 @@ jobs:
           echo "ArtifactoryPasswordSecret=$(echo "$JSON_STRING" | jq -r '.general.ArtifactoryPasswordSecret')" >> "$GITHUB_ENV"
           echo "ARTIFACT_HOST_SECRET=$(echo "$JSON_STRING" | jq -r '.general.ArtifactoryHostSecret')" >> "$GITHUB_ENV"
           echo "DOCKER_LOGIN_URL=$(echo "$REGISTRY_URL" | cut -d'/' -f1)" >> "$GITHUB_ENV"
+
+      - name: Inject Secret
+        id: import-secrets
+        uses: hashicorp/vault-action@v2
+        with:
+          url: ${{ secrets.VAULT_URL }}
+          token: ${{ secrets.VAULT_TOKEN }}
+          secrets: |
+            secret/data/kv/dev/apps/service01 appkey | TEST_APP_KEY ;
+            secret/data/kv/dev/apps/service01 apptoken | TEST_APP_TOKEN ;
