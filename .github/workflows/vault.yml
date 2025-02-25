@@ -61,5 +61,5 @@ jobs:
           url: ${{ secrets.VAULT_URL }}
           token: ${{ secrets.VAULT_TOKEN }}
           secrets: |
-            secret/data/kv/dev/apps/service01 appkey | TEST_APP_KEY ;
-            secret/data/kv/dev/apps/service01 apptoken | TEST_APP_TOKEN ;
+            kv/data/dev/apps/service01 appkey | TEST_APP_KEY ;
+            kv/data/dev/apps/service01 apptoken | TEST_APP_TOKEN ;
