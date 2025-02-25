@@ -60,12 +60,13 @@ jobs:
             echo "VAULT_URL=$(echo "$JSON_STRING" | jq -r '.docker.vault.configuration.vaultUrl')" >> "$GITHUB_ENV"
             echo "VAULT_TOKEN_SECRET=$(echo "$JSON_STRING" | jq -r '.docker.vault.configuration.vaultTokenSecret')" >> "$GITHUB_ENV"
             echo "VAULT_SECRETS_PATH=$(echo "$JSON_STRING" | jq -r '.docker.vault.secrets.path')" >> "$GITHUB_ENV"
+            echo "VAULT_SECRETS_KEYS=$(echo "$JSON_STRING" | jq -r '.docker.vault.secrets.secretValues')" >> "$GITHUB_ENV"
           else
             echo "No vault configuration found"
           fi
 
-      - name: Inject Secret
-        id: import-secrets
+      - name: Read Secret
+        id: read-secrets
         uses: hashicorp/vault-action@v2
         with:
           url: ${{ env.VAULT_URL }}
@@ -76,4 +77,12 @@ jobs:
       - name: Print Secret
         run: |
           echo "${{ env.CAL_APPKEY }}"
-          echo "${{ steps.import-secrets.outputs.CAL_APPTOKEN }}"
+          echo "${{ steps.read-secrets.outputs.CAL_APPTOKEN }}"
+
+      - name: Injects Secrets 
+        run: |
+          touch sec_values.json
+          echo '${{ toJson(steps.read-secrets.outputs) }}' >> sec_values.json
+          jq -r 'to_entries | map("\(.key)=\(.value)") | .[]' sec_values.json > env.list
+          echo env.list
+
