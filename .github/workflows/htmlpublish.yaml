@@ -1,0 +1,23 @@
+name: Deploy HTML Report
+
+on: [workflow_dispatch]
+
+jobs:
+  deploy-report:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Generate Report
+        run: |
+          mkdir -p reports
+          echo "<html><body><h1>Test Report</h1></body></html>" > reports/index.html
+
+      - name: Deploy to GitHub Pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: reports
