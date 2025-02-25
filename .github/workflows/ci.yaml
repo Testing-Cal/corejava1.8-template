@@ -77,7 +77,7 @@ jobs:
         if: env.CONTAINER_SCAN_TYPE == 'XRAY'
         uses: jfrog/setup-jfrog-cli@v4
         env:
-          JF_URL: ${{ secrets[env.ArtifactoryHostSecret] }}
+          JF_URL: ${{ secrets[env.ARTIFACT_HOST_SECRET] }}
           JF_ACCESS_TOKEN: ${{ secrets[env.ArtifactoryPasswordSecret] }}
 
       - name: Container Image Scan
