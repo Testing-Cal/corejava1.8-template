@@ -53,9 +53,11 @@ jobs:
           echo "ArtifactoryPasswordSecret=$(echo "$JSON_STRING" | jq -r '.general.ArtifactoryPasswordSecret')" >> "$GITHUB_ENV"
           echo "ARTIFACT_HOST_SECRET=$(echo "$JSON_STRING" | jq -r '.general.ArtifactoryHostSecret')" >> "$GITHUB_ENV"
           echo "DOCKER_LOGIN_URL=$(echo "$REGISTRY_URL" | cut -d'/' -f1)" >> "$GITHUB_ENV"
+          echo "VAULT_CONFIG_PRESENT=$(echo "$JSON_STRING" | jq -e '.docker.vault | has("type")' > /dev/null;)" >> "$GITHUB_ENV"
 
           # for Vault
-          if echo "$JSON_STRING" | jq -e '.docker.vault | has("type")' > /dev/null; then
+          if [[ $VAULT_CONFIG_PRESENT ]]; then
+          #if echo "$JSON_STRING" | jq -e '.docker.vault | has("type")' > /dev/null; then
             echo "Vault configuration present"
             echo "VAULT_URL=$(echo "$JSON_STRING" | jq -r '.docker.vault.configuration.vaultUrl')" >> "$GITHUB_ENV"
             echo "VAULT_TOKEN_SECRET=$(echo "$JSON_STRING" | jq -r '.docker.vault.configuration.vaultTokenSecret')" >> "$GITHUB_ENV"
