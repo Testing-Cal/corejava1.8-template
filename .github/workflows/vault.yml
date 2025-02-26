@@ -53,12 +53,12 @@ jobs:
           echo "ArtifactoryPasswordSecret=$(echo "$JSON_STRING" | jq -r '.general.ArtifactoryPasswordSecret')" >> "$GITHUB_ENV"
           echo "ARTIFACT_HOST_SECRET=$(echo "$JSON_STRING" | jq -r '.general.ArtifactoryHostSecret')" >> "$GITHUB_ENV"
           echo "DOCKER_LOGIN_URL=$(echo "$REGISTRY_URL" | cut -d'/' -f1)" >> "$GITHUB_ENV"
-          echo "VAULT_CONFIG_PRESENT=$(echo "$JSON_STRING" | jq -e '.docker.vault | has("type")' > /dev/null;)" >> "$GITHUB_ENV"
-
+          
           # for Vault
-          if [[ $VAULT_CONFIG_PRESENT ]]; then
-          #if echo "$JSON_STRING" | jq -e '.docker.vault | has("type")' > /dev/null; then
+          #if [[ $VAULT_CONFIG_PRESENT ]]; then
+          if echo "$JSON_STRING" | jq -e '.docker.vault | has("type")' > /dev/null; then
             echo "Vault configuration present"
+            echo "VAULT_CONFIG_PRESENT=true" >> "$GITHUB_ENV"
             echo "VAULT_URL=$(echo "$JSON_STRING" | jq -r '.docker.vault.configuration.vaultUrl')" >> "$GITHUB_ENV"
             echo "VAULT_TOKEN_SECRET=$(echo "$JSON_STRING" | jq -r '.docker.vault.configuration.vaultTokenSecret')" >> "$GITHUB_ENV"
             echo "VAULT_SECRETS_PATH=$(echo "$JSON_STRING" | jq -r '.docker.vault.secrets.path')" >> "$GITHUB_ENV"
@@ -66,9 +66,11 @@ jobs:
             echo "VAULT_SECRETS_KEYS=$(echo "$JSON_STRING" | jq -c '.docker.vault.secrets.secretValues' )" >> "$GITHUB_ENV"
           else
             echo "No vault configuration found"
+            echo "VAULT_CONFIG_PRESENT=false" >> "$GITHUB_ENV"
           fi
 
       - name: Read Secret
+        if: env.VAULT_CONFIG_PRESENT == true
         id: read-secrets
         uses: hashicorp/vault-action@v2
         with:
@@ -78,11 +80,13 @@ jobs:
               ${{ env.VAULT_SECRETS_PATH }} * | CAL_ ;
 
       - name: Print Secret
+        if: env.VAULT_CONFIG_PRESENT == true
         run: |
           echo "${{ env.CAL_APPKEY }}"
           echo "${{ steps.read-secrets.outputs.CAL_APPTOKEN }}"
 
       - name: Injects Secrets 
+        if: env.VAULT_CONFIG_PRESENT == true
         run: |
           touch sec_values.json final_value.env
           echo '${{ toJson(steps.read-secrets.outputs) }}' >> sec_values.json
