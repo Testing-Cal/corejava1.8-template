@@ -70,7 +70,7 @@ jobs:
           fi
 
       - name: Read Secret
-        if: env.VAULT_CONFIG_PRESENT == true
+        if: env.VAULT_CONFIG_PRESENT == 'true'
         id: read-secrets
         uses: hashicorp/vault-action@v2
         with:
@@ -80,13 +80,13 @@ jobs:
               ${{ env.VAULT_SECRETS_PATH }} * | CAL_ ;
 
       - name: Print Secret
-        if: env.VAULT_CONFIG_PRESENT == true
+        if: env.VAULT_CONFIG_PRESENT == 'true'
         run: |
           echo "${{ env.CAL_APPKEY }}"
           echo "${{ steps.read-secrets.outputs.CAL_APPTOKEN }}"
 
       - name: Injects Secrets 
-        if: env.VAULT_CONFIG_PRESENT == true
+        if: env.VAULT_CONFIG_PRESENT == 'true'
         run: |
           touch sec_values.json final_value.env
           echo '${{ toJson(steps.read-secrets.outputs) }}' >> sec_values.json
