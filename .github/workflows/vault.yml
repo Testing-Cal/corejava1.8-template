@@ -69,7 +69,7 @@ jobs:
             echo "VAULT_CONFIG_PRESENT=false" >> "$GITHUB_ENV"
           fi
 
-      - name: Read Secret
+      - name: HCP Vault - Read Secret
         if: env.VAULT_CONFIG_PRESENT == 'true'
         id: read-secrets
         uses: hashicorp/vault-action@v2
@@ -79,13 +79,8 @@ jobs:
           secrets: |
               ${{ env.VAULT_SECRETS_PATH }} * | CAL_ ;
 
-      - name: Print Secret
-        if: env.VAULT_CONFIG_PRESENT == 'true'
-        run: |
-          echo "${{ env.CAL_APPKEY }}"
-          echo "${{ steps.read-secrets.outputs.CAL_APPTOKEN }}"
 
-      - name: Injects Secrets 
+      - name: HCP Vault - Injects Secrets 
         if: env.VAULT_CONFIG_PRESENT == 'true'
         run: |
           touch sec_values.json final_value.env
