@@ -93,7 +93,7 @@ jobs:
             AWS_ACCESS_KEY_ID=${{ secrets[env.ArtifactoryUserSecret] }} AWS_SECRET_ACCESS_KEY=${{ secrets[env.ArtifactoryPasswordSecret] }} aws ecr get-login-password --region "$ECR_REGION" | docker login --username AWS --password-stdin $DOCKER_LOGIN_URL 
             set -x
           else
-            docker login -u ${{ secrets[env.ArtifactoryUserSecret] }} -p ${{ secrets[env.ArtifactoryPasswordSecret] }} "$DOCKER_LOGIN_URL"
+            docker login -u ${{ secrets[env.ArtifactoryUserSecret] }} -p ${{ secrets[env.ArtifactoryPasswordSecret] }} "$REGISTRY_URL"
           fi
           
           docker push "$REGISTRY_URL:$BUILD_TAG"
