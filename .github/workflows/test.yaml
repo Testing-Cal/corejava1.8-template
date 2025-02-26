@@ -1,4 +1,4 @@
-name: Qualys Scan Test
+name: Xray Scan Test
 
 on:
   #push:
