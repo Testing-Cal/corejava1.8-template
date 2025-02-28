@@ -36,6 +36,8 @@ jobs:
                
                 echo "REGISTRY_URL=$(echo "$JSON_STRING" | jq -r '.general.containerImagePath')" >> "$GITHUB_ENV"
                 echo "CONTAINER_SCAN_TYPE=$(echo "$JSON_STRING" | jq -r '.general.containerScanType')" >> "$GITHUB_ENV"
+                export REGISTRY_URL=$(echo "$JSON_STRING" | jq -r '.general.containerImagePath')
+                echo "DOCKER_LOGIN_URL=$(echo "$REGISTRY_URL" | cut -d'/' -f1)" >> "$GITHUB_ENV"
 
       
                 #echo "$JSON_STRING" | jq -r '.kubernetes' | yq --yaml-output > Helm.yaml
