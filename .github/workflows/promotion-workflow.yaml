@@ -56,8 +56,6 @@ jobs:
           echo "ARTIFACTORY_PASSWORD_SECRET=$(echo "$JSON_STRING" | jq -r '.general.ArtifactoryPasswordSecret')" >> "$GITHUB_ENV"
           echo "PROMOTE_SOURCE_ARTIFACTORY_TYPE=$(echo "$JSON_STRING" | jq -r '.general.promoteSourceArtifactoryType')" >> "$GITHUB_ENV"
           echo "PROMOTE_TAG=$(echo "$JSON_STRING" | jq -r '.general.promoteTag')" >> "$GITHUB_ENV"
-          
-
 
           echo "$JSON_STRING" | jq -r '.kubernetes' | yq --yaml-output > Helm.yaml
           #echo "$JSON_STRING" | jq -r '.kubernetes.vault' | yq -P > Vault.yaml
@@ -65,24 +63,39 @@ jobs:
 
       - name: Artifact Promotion 
         run: |
-          docker login -u ${{ secrets.ARTIFACTORY_USER_SECRET }} -p ${{ secrets.ARTIFACTORY_PASSWORD_SECRET }} "$REGISTRY_URL"
-         
+          echo "DOCKER_LOGIN_URL=$(echo "$REGISTRY_URL" | cut -d'/' -f1)" >> "$GITHUB_ENV"
+          if [[ $ARTIFACTORY == "ECR" ]]
+          then
+            ECR_REGION=$(echo "$REGISTRY_URL" | cut -d'.' -f4)
+            set +x 
+            AWS_ACCESS_KEY_ID=${{ secrets[env.ARTIFACTORY_USER_SECRET] }} AWS_SECRET_ACCESS_KEY=${{ secrets[env.ARTIFACTORY_PASSWORD_SECRET] }} aws ecr get-login-password --region "$ECR_REGION" | docker login --username AWS --password-stdin $DOCKER_LOGIN_URL 
+            set -x
+          else
+            docker login -u ${{ secrets[env.ARTIFACTORY_USER_SECRET] }} -p ${{ secrets[env.ARTIFACTORY_PASSWORD_SECRET] }} "$DOCKER_LOGIN_URL"
+          fi
           PROMOTE_SOURCE_LOGIN_URL=$(echo "$PROMOTE_SOURCE" | cut -d'/' -f1)
           if [[ $PROMOTE_SOURCE_ARTIFACTORY_TYPE == "ECR" ]]
           then
             REGION=$(echo "$PROMOTE_SOURCE" | cut -d'.' -f4)
             PROMOTE_SOURCE_ECR_REGION=$(echo "$PROMOTE_SOURCE" | cut -d'.' -f4)
             set +x 
-            AWS_ACCESS_KEY_ID=${{ secrets.PROMOTE_SOURCE_ARTIFACTORY_USER_SECRET }} AWS_SECRET_ACCESS_KEY=${{ secrets.PROMOTE_SOURCE_ARTIFACTORY_PASSWORD_SECRET }} aws ecr get-login-password --region "$PROMOTE_SOURCE_ECR_REGION" | docker login --username AWS --password-stdin $PROMOTE_SOURCE_LOGIN_URL 
+            AWS_ACCESS_KEY_ID=${{ secrets[env.PROMOTE_SOURCE_ARTIFACTORY_USER_SECRET] }} AWS_SECRET_ACCESS_KEY=${{ secrets[env.PROMOTE_SOURCE_ARTIFACTORY_PASSWORD_SECRET] }} aws ecr get-login-password --region "$PROMOTE_SOURCE_ECR_REGION" | docker login --username AWS --password-stdin $PROMOTE_SOURCE_LOGIN_URL 
             set -x
           else
-            docker login -u ${{ secrets.PROMOTE_SOURCE_ARTIFACTORY_USER_SECRET }} -p ${{ secrets.PROMOTE_SOURCE_ARTIFACTORY_PASSWORD_SECRET }} "$PROMOTE_SOURCE_LOGIN_URL"
+            docker login -u ${{ secrets[env.PROMOTE_SOURCE_ARTIFACTORY_USER_SECRET] }} -p ${{ secrets[env.PROMOTE_SOURCE_ARTIFACTORY_PASSWORD_SECRET] }} "$PROMOTE_SOURCE_LOGIN_URL"
           fi
 
           docker pull $PROMOTE_SOURCE
           docker image tag $PROMOTE_SOURCE $REGISTRY_URL:$PROMOTE_TAG
           docker push $REGISTRY_URL:$PROMOTE_TAG
           echo "BUILD_TAG=$PROMOTE_TAG"  >> "$GITHUB_ENV"
+          
+      - name: Configure Kubeconfig File
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ env.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config
           
       - name: Deploy to Kubernetes
         run: | 
@@ -96,21 +109,19 @@ jobs:
               else
                   ACCOUNT='default'
               fi
-              docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" -v "$WORKSPACE":/apps -w /apps $OC_IMAGE_VERSION oc adm policy add-scc-to-user anyuid -z $ACCOUNT -n "$KUBE_NAMESPACE"
+              docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" -v "$GITHUB_WORKSPACE":/apps -w /apps $OC_IMAGE_VERSION oc adm policy add-scc-to-user anyuid -z $ACCOUNT -n "$KUBE_NAMESPACE"
            fi
-           
-           DOCKER_LOGIN_URL=$(echo "$REGISTRY_URL" | cut -d'/' -f1)
             
            ## hardcoded name regcred need to be change
            docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" $KUBECTL_IMAGE_VERSION -n "$KUBE_NAMESPACE" delete secret regcred --ignore-not-found || true
-           docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" $KUBECTL_IMAGE_VERSION -n "$KUBE_NAMESPACE" create secret docker-registry regcred --docker-server="$DOCKER_LOGIN_URL" --docker-username=${{ secrets.ARTIFACTORY_USER_SECRET }} --docker-password="${{ secrets.ARTIFACTORY_PASSWORD_SECRET }}" || true
+           docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" $KUBECTL_IMAGE_VERSION -n "$KUBE_NAMESPACE" create secret docker-registry regcred --docker-server="$DOCKER_LOGIN_URL" --docker-username=${{ secrets[env.ARTIFACTORY_USER_SECRET] }} --docker-password="${{ secrets[env.ARTIFACTORY_PASSWORD_SECRET] }}" || true
                                                
            # custom helm chart
 
            echo "context: $CONTEXT" >> Helm.yaml
            cat Helm.yaml
            sed -i s+#SERVICE_NAME#+"$HELM_RELEASE_NAME"+g ./helm_chart/values.yaml ./helm_chart/Chart.yaml
-           docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" -v "$WORKSPACE":/apps -w /apps $HELM_IMAGE_VERSION upgrade --install "$helmReleaseName" -n "$KUBE_NAMESPACE" helm_chart --atomic --timeout 300s --set image.repository="$REGISTRY_URL" --set image.tag="$BUILD_TAG" --set image.registrySecret="regcred"  --set service.internalport="$SERVICE_PORT" -f Helm.yaml
+           docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" -v "$GITHUB_WORKSPACE":/apps -w /apps $HELM_IMAGE_VERSION upgrade --install "$helmReleaseName" -n "$KUBE_NAMESPACE" helm_chart --atomic --timeout 300s --set image.repository="$REGISTRY_URL" --set image.tag="$BUILD_TAG" --set image.registrySecret="regcred"  --set service.internalport="$SERVICE_PORT" -f Helm.yaml
 
 
           
