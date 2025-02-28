@@ -56,7 +56,7 @@ jobs:
           echo "HELM_CHART_LOCATION=$(echo "$JSON_STRING" | jq -r '.helm.workingDirectory')" >> "$GITHUB_ENV"
           echo "CHART_VALUES_PATH=$(echo "$JSON_STRING" | jq -r '.helm.values')" >> "$GITHUB_ENV"
           echo "HELM_REPO_BRANCH=$(echo "$JSON_STRING" | jq -r '.helm.helmRepoBranch')" >> "$GITHUB_ENV"
-          
+          export HELM_REPO_URL=$(echo "$JSON_STRING" | jq -r '.helm.helmRepoUrl')
           echo "HELM_REPO_PATH=$(echo "$HELM_REPO_URL" | cut -d'/' -f4-5 | sed 's/.git$//')" >> "$GITHUB_ENV"
 
           echo "$JSON_STRING" | jq -r '.kubernetes' | yq -P > Helm.yaml
