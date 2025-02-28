@@ -18,12 +18,11 @@ on:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_NAME_DEV }}
     environment:
       name: 'dev'
       url: 'https://test.com'
     env:
-      JAVA_MVN_IMAGE_VERSION: "amazoncorretto:8-alpine" #https://hub.docker.com/_/maven/tags
       KUBECTL_IMAGE_VERSION: "bitnami/kubectl:1.28" #https://hub.docker.com/r/bitnami/kubectl/tags
       HELM_IMAGE_VERSION: "alpine/helm:3.8.1" #https://hub.docker.com/r/alpine/helm/tags
       OC_IMAGE_VERSION: "quay.io/openshift/origin-cli:4.9.0" #https://quay.io/repository/openshift/origin-cli?tab=tags
@@ -36,62 +35,58 @@ jobs:
       - name: Initialization
         run: |
           sudo apt install yq -y 
-          JSON_STRING='${{ inputs.github_metadata }}'
+          JSON_STRING='${{ vars.BUILD_METADATA }}'
          
           echo "REGISTRY_URL=$(echo "$JSON_STRING" | jq -r '.general.containerImagePath')" >> "$GITHUB_ENV"
           echo "BUILD_TAG=$(echo "$JSON_STRING" | jq -r '.general.containerImageTag')"  >> "$GITHUB_ENV"
-          echo "ARTIFACTORY_CREDENTIALS=$(echo "$JSON_STRING" | jq -r '.general.artifactorySecret')"  >> "$GITHUB_ENV"
-          echo "SONAR_CREDENTIAL_ID=$(echo "$JSON_STRING" | jq -r '.general.sonarSecret')"  >> "$GITHUB_ENV"
+        
           echo "ARTIFACTORY=$(echo "$JSON_STRING" | jq -r '.general.artifactory')"  >> "$GITHUB_ENV"
-          echo "STAGE_FLAG=$(echo "$JSON_STRING" | jq -r '.general.stageFlag')"  >> "$GITHUB_ENV"
-          echo "CONTAINERSCANTYPE=$(echo "$JSON_STRING" | jq -r '.general.containerScanType')"  >> "$GITHUB_ENV"
+      
           echo "DOCKERHOST=$(echo "$JSON_STRING" | jq -r '.general.dockerHostIP')"  >> "$GITHUB_ENV"
           echo "RELEASE_NAME=$(echo "$JSON_STRING" | jq -r '.general.name')"  >> "$GITHUB_ENV"
           echo "CONTEXT=$(echo "$JSON_STRING" | jq -r '.general.contextPath')" >> "$GITHUB_ENV"
-          echo "sonar_org=$(echo "$JSON_STRING" | jq -r '.general.sonarOrg')" >> "$GITHUB_ENV"
-          echo "sonar_host=$(echo "$JSON_STRING" | jq -r '.general.sonarHost')" >> "$GITHUB_ENV"
-          echo "sonar_project_key=$(echo "$JSON_STRING" | jq -r '.general.sonarProjectKey')" >> "$GITHUB_ENV"
-          echo "helmReleaseName=$(echo "$JSON_STRING" | jq -r '.general.helmReleaseName')" >> "$GITHUB_ENV"
-          echo "namespace_name=$(echo "$JSON_STRING" | jq -r '.kubernetes.namespace')" >> "$GITHUB_ENV"
-          echo "helmRepoUrl=$(echo "$JSON_STRING" | jq -r '.helm.helmRepoUrl')" >> "$GITHUB_ENV"
-          echo "promoteSource=$(echo "$JSON_STRING" | jq -r '.general.promoteSource')" >> "$GITHUB_ENV"
-          echo "promoteSourceArtifactoryUserSecret=$(echo "$JSON_STRING" | jq -r '.general.promoteSourceArtifactoryUserSecret')" >> "$GITHUB_ENV"
-          echo "promoteSourceArtifactoryPasswordSecret=$(echo "$JSON_STRING" | jq -r '.general.promoteSourceArtifactoryPasswordSecret')" >> "$GITHUB_ENV"
-          echo "ArtifactoryUserSecret=$(echo "$JSON_STRING" | jq -r '.general.ArtifactoryUserSecret')" >> "$GITHUB_ENV"
-          echo "ArtifactoryPasswordSecret=$(echo "$JSON_STRING" | jq -r '.general.ArtifactoryPasswordSecret')" >> "$GITHUB_ENV"
-          echo "promoteSourceArtifactoryType=$(echo "$JSON_STRING" | jq -r '.general.promoteSourceArtifactoryType')" >> "$GITHUB_ENV"
-          echo "promoteTag=$(echo "$JSON_STRING" | jq -r '.general.promoteTag')" >> "$GITHUB_ENV"
+          
+          echo "HELM_RELEASE_NAME=$(echo "$JSON_STRING" | jq -r '.general.helmReleaseName')" >> "$GITHUB_ENV"
+          echo "KUBE_NAMESPACE=$(echo "$JSON_STRING" | jq -r '.kubernetes.namespace')" >> "$GITHUB_ENV"
+         
+          echo "PROMOTE_SOURCE=$(echo "$JSON_STRING" | jq -r '.general.promoteSource')" >> "$GITHUB_ENV"
+          echo "PROMOTE_SOURCE_ARTIFACTORY_USER_SECRET=$(echo "$JSON_STRING" | jq -r '.general.promoteSourceArtifactoryUserSecret')" >> "$GITHUB_ENV"
+          echo "PROMOTE_SOURCE_ARTIFACTORY_PASSWORD_SECRET(echo "$JSON_STRING" | jq -r '.general.promoteSourceArtifactoryPasswordSecret')" >> "$GITHUB_ENV"
+          echo "ARTIFACTORY_USER_SECRET=$(echo "$JSON_STRING" | jq -r '.general.ArtifactoryUserSecret')" >> "$GITHUB_ENV"
+          echo "ARTIFACTORY_PASSWORD_SECRET=$(echo "$JSON_STRING" | jq -r '.general.ArtifactoryPasswordSecret')" >> "$GITHUB_ENV"
+          echo "PROMOTE_SOURCE_ARTIFACTORY_TYPE=$(echo "$JSON_STRING" | jq -r '.general.promoteSourceArtifactoryType')" >> "$GITHUB_ENV"
+          echo "PROMOTE_TAG=$(echo "$JSON_STRING" | jq -r '.general.promoteTag')" >> "$GITHUB_ENV"
           
 
 
-          echo "$JSON_STRING" | jq -r '.kubernetes' | yq -P > Helm.yaml
+          echo "$JSON_STRING" | jq -r '.kubernetes' | yq --yaml-output > Helm.yaml
           #echo "$JSON_STRING" | jq -r '.kubernetes.vault' | yq -P > Vault.yaml
       
 
       - name: Artifact Promotion 
         run: |
-          docker login -u ${{ secrets.ArtifactoryUserSecret }} -p ${{ secrets.ArtifactoryPasswordSecret }} "$REGISTRY_URL"
+          docker login -u ${{ secrets.ARTIFACTORY_USER_SECRET }} -p ${{ secrets.ARTIFACTORY_PASSWORD_SECRET }} "$REGISTRY_URL"
          
-          PROMOTE_SOURCE_LOGIN_URL=$(echo "$promoteSource" | cut -d'/' -f1)
-          if [[ $promoteSourceArtifactoryType == "ECR" ]]
+          PROMOTE_SOURCE_LOGIN_URL=$(echo "$PROMOTE_SOURCE" | cut -d'/' -f1)
+          if [[ $PROMOTE_SOURCE_ARTIFACTORY_TYPE == "ECR" ]]
           then
-            REGION=$(echo "$promoteSource" | cut -d'.' -f4)
-            PROMOTE_SOURCE_ECR_REGION=$(echo "$promoteSource" | cut -d'.' -f4)
+            REGION=$(echo "$PROMOTE_SOURCE" | cut -d'.' -f4)
+            PROMOTE_SOURCE_ECR_REGION=$(echo "$PROMOTE_SOURCE" | cut -d'.' -f4)
             set +x 
-            AWS_ACCESS_KEY_ID=${{ secrets.promoteSourceArtifactoryUserSecret }} AWS_SECRET_ACCESS_KEY=${{ secrets.promoteSourceArtifactoryPasswordSecret }} aws ecr get-login-password --region "$PROMOTE_SOURCE_ECR_REGION" | docker login --username AWS --password-stdin $PROMOTE_SOURCE_LOGIN_URL 
+            AWS_ACCESS_KEY_ID=${{ secrets.PROMOTE_SOURCE_ARTIFACTORY_USER_SECRET }} AWS_SECRET_ACCESS_KEY=${{ secrets.PROMOTE_SOURCE_ARTIFACTORY_PASSWORD_SECRET }} aws ecr get-login-password --region "$PROMOTE_SOURCE_ECR_REGION" | docker login --username AWS --password-stdin $PROMOTE_SOURCE_LOGIN_URL 
             set -x
           else
-            docker login -u ${{ secrets.promoteSourceArtifactoryUserSecret }} -p ${{ secrets.promoteSourceArtifactoryPasswordSecret }} "$PROMOTE_SOURCE_LOGIN_URL"
+            docker login -u ${{ secrets.PROMOTE_SOURCE_ARTIFACTORY_USER_SECRET }} -p ${{ secrets.PROMOTE_SOURCE_ARTIFACTORY_PASSWORD_SECRET }} "$PROMOTE_SOURCE_LOGIN_URL"
           fi
 
-          docker pull $promoteSource
-          docker image tag $promoteSource $REGISTRY_URL:$promoteTag
-          docker push $REGISTRY_URL:$promoteTag
-          echo "BUILD_TAG=$promoteTag"  >> "$GITHUB_ENV"
+          docker pull $PROMOTE_SOURCE
+          docker image tag $PROMOTE_SOURCE $REGISTRY_URL:$PROMOTE_TAG
+          docker push $REGISTRY_URL:$PROMOTE_TAG
+          echo "BUILD_TAG=$PROMOTE_TAG"  >> "$GITHUB_ENV"
           
       - name: Deploy to Kubernetes
         run: | 
-           docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" $KUBECTL_IMAGE_VERSION create ns "$namespace_name" || true
+           docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" $KUBECTL_IMAGE_VERSION create ns "$KUBE_NAMESPACE" || true
            if [[ $DEPLOYMENT_TYPE == 'OPENSHIFT' ]]
               COUNT=$(grep 'serviceAccount' Helm.yaml | wc -l)
               if [[ $COUNT -gt 0 ]]
@@ -101,21 +96,21 @@ jobs:
               else
                   ACCOUNT='default'
               fi
-              docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" -v "$WORKSPACE":/apps -w /apps $OC_IMAGE_VERSION oc adm policy add-scc-to-user anyuid -z $ACCOUNT -n "$namespace_name"
+              docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" -v "$WORKSPACE":/apps -w /apps $OC_IMAGE_VERSION oc adm policy add-scc-to-user anyuid -z $ACCOUNT -n "$KUBE_NAMESPACE"
            fi
            
            DOCKER_LOGIN_URL=$(echo "$REGISTRY_URL" | cut -d'/' -f1)
             
            ## hardcoded name regcred need to be change
-           docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" $KUBECTL_IMAGE_VERSION -n "$namespace_name" delete secret regcred --ignore-not-found || true
-           docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" $KUBECTL_IMAGE_VERSION -n "$namespace_name" create secret docker-registry regcred --docker-server="$DOCKER_LOGIN_URL" --docker-username=${{ secrets.ArtifactoryUserSecret }} --docker-password="${{ secrets.ArtifactoryPasswordSecret }}" || true
+           docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" $KUBECTL_IMAGE_VERSION -n "$KUBE_NAMESPACE" delete secret regcred --ignore-not-found || true
+           docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" $KUBECTL_IMAGE_VERSION -n "$KUBE_NAMESPACE" create secret docker-registry regcred --docker-server="$DOCKER_LOGIN_URL" --docker-username=${{ secrets.ARTIFACTORY_USER_SECRET }} --docker-password="${{ secrets.ARTIFACTORY_PASSWORD_SECRET }}" || true
                                                
            # custom helm chart
 
            echo "context: $CONTEXT" >> Helm.yaml
            cat Helm.yaml
-           sed -i s+#SERVICE_NAME#+"$helmReleaseName"+g ./helm_chart/values.yaml ./helm_chart/Chart.yaml
-           docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" -v "$WORKSPACE":/apps -w /apps $HELM_IMAGE_VERSION upgrade --install "$helmReleaseName" -n "$namespace_name" helm_chart --atomic --timeout 300s --set image.repository="$REGISTRY_URL" --set image.tag="$BUILD_TAG" --set image.registrySecret="regcred"  --set service.internalport="$SERVICE_PORT" -f Helm.yaml
+           sed -i s+#SERVICE_NAME#+"$HELM_RELEASE_NAME"+g ./helm_chart/values.yaml ./helm_chart/Chart.yaml
+           docker run --rm  --user root -v "$HOME/.kube/config":"/.kube/config" -e KUBECONFIG="/.kube/config" -v "$WORKSPACE":/apps -w /apps $HELM_IMAGE_VERSION upgrade --install "$helmReleaseName" -n "$KUBE_NAMESPACE" helm_chart --atomic --timeout 300s --set image.repository="$REGISTRY_URL" --set image.tag="$BUILD_TAG" --set image.registrySecret="regcred"  --set service.internalport="$SERVICE_PORT" -f Helm.yaml
 
 
           
