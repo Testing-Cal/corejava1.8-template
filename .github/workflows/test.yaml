@@ -31,7 +31,7 @@ jobs:
         
       - name: Initialization
         run: |
-                sudo yum install jq -y 
+                sudo apt install jq -y 
                 JSON_STRING='${{ inputs.github_metadata }}'
                
                 echo "REGISTRY_URL=$(echo "$JSON_STRING" | jq -r '.general.containerImagePath')" >> "$GITHUB_ENV"
