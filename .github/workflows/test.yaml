@@ -44,9 +44,7 @@ jobs:
                 #echo "$JSON_STRING" | jq -r '.kubernetes.vault' | yq -P > Vault.yaml
 
       - name: Print ContainerScanType
-        env: 
-          test: $(DOCKER_LOGIN_URL=$(echo "$REGISTRY_URL" | cut -d'/' -f1)")
-        run: echo "$test"
+        run: echo "$DOCKER_LOGIN_URL"
 
       - name: Setup JFrog CLI
         if: env.CONTAINER_SCAN_TYPE == 'XRAY'
